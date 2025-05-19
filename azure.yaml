@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: simple-streamlit-webapp
+metadata:
+  template: simple-stremamlit-webapp@0.0.1-beta
+services:
+  web:
+    project: ./src
+    language: py
+    host: appservice
+hooks:
+  postprovision:
+    windows:
+      shell: pwsh
+      run: ./scripts/map-env-vars.ps1
+      interactive: false
+      continueOnError: false
+    posix:
+      shell: sh
+      run: ./scripts/map-env-vars.sh
+      interactive: false
+      continueOnError: false
