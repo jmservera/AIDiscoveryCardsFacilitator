@@ -2,6 +2,7 @@
 
 import streamlit as st
 import openai
+import tiktoken
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 from dotenv import load_dotenv
@@ -46,7 +47,11 @@ def create_chat_completion(messages):
               {"role": m["role"], "content": m["content"]}
               for m in messages
           ],
-          stream=True #,
+          stream=True,
+          stream_options={
+              "include_usage": True
+          }
+            #,
         #   extra_body={
         #       "data_sources": [
         #           {
@@ -73,6 +78,9 @@ def handle_chat_prompt(prompt):
     with st.chat_message("user"):
         st.markdown(prompt)
  
+    # Calculate tokens in the input
+    input_tokens = count_tokens(st.session_state.messages)
+    
     # Send the user's prompt to Azure OpenAI and display the response
     # The call to Azure OpenAI is handled in create_chat_completion()
     # This function loops through the responses and displays them as they come in.
@@ -80,12 +88,56 @@ def handle_chat_prompt(prompt):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
+        completion = None
         for response in create_chat_completion(st.session_state.messages):
             if response.choices:
                 full_response += (response.choices[0].delta.content or "")
                 message_placeholder.markdown(full_response + "▌")
+            completion = response
         message_placeholder.markdown(full_response)
+    
+    # Add the response to the messages
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+    
+    # Display token usage
+    if completion and completion.usage:
+        st.caption(f"""Token usage for this interaction:
+        - Input tokens: {input_tokens}
+        - Output tokens: {completion.usage.completion_tokens}
+        - Total tokens: {completion.usage.total_tokens}""")
+    
+
+def get_init_messages():
+    """Return the initial messages for the chat history.
+    This is a simple system message that sets the context for the chat."""
+
+    # Read the files facilitator_persona.md and ai_discovery_cards.md into a list of strings
+    with open("prompts/facilitator_persona.md", "r") as f:
+        facilitator_persona = f.read()
+    with open("prompts/ai_discovery_cards.md", "r") as f:
+        ai_discovery_cards = f.read()
+    return [
+        {
+            "role": "system",
+            "content": facilitator_persona
+        },
+        {
+            "role": "system",
+            "content": f"Find the AI Discovery Cards definitions below:\n\n{ai_discovery_cards}"
+        }
+    ]
+
+def count_tokens(messages):
+    """Count the number of tokens in the messages."""
+    encoding = tiktoken.get_encoding("cl100k_base")  # This is the encoding used by GPT-4
+    num_tokens = 0
+    for message in messages:
+        # Every message follows <im_start>{role/name}\n{content}<im_end>\n
+        num_tokens += 4
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(str(value)))
+    num_tokens += 2  # Every reply is primed with <im_start>assistant
+    return num_tokens
 
 def main():
     """Main function for the Chat with Data Streamlit app."""
@@ -100,7 +152,7 @@ def main():
 
     # Initialize chat history
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "system", "content": "You are a helpful facilitator for Design Thinking Workshops. Start asking the user the most relevant questions to gather data to start with the workshop and then guide them through a useful design thinking process."}]
+        st.session_state.messages = get_init_messages()
 
 
     # Display chat messages from history on app rerun
