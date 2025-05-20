@@ -33,8 +33,9 @@ def get_current_page_name():
 
 
 def make_sidebar():
+    st.set_page_config(layout="wide",
+                    page_icon=str(CURRENT_DIR) + "/assets/logo.png")
     st.logo(str(CURRENT_DIR) + "/assets/logo.png", size='medium')
-    st.set_page_config(layout="wide")
     with st.sidebar:
         st.subheader("🗂️ AI Discovery Cards")
         st.write("")
