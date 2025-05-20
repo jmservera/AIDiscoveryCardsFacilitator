@@ -1,5 +1,6 @@
 import streamlit as st
 from utils.openai_utils import handle_chat_prompt, load_prompt_files
+from st_copy import copy_button
 
 from navigation import make_sidebar
 
@@ -36,7 +37,9 @@ if "messages" not in page:
 for message in page["messages"]:
     if message["role"] != "system":
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            msg=message["content"]
+            st.markdown(msg)
+            copy_button(msg, key=msg)
 
 # Await a user message and handle the chat prompt when it comes in.
 if prompt := st.chat_input("Enter a message:"):

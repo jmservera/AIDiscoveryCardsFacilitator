@@ -8,7 +8,7 @@ import tiktoken
 import re
 import os
 from dotenv import load_dotenv
-
+from st_copy import copy_button
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from streamlit.logger import get_logger
 
@@ -148,6 +148,7 @@ def handle_chat_prompt(prompt, page):
     
     # Display token usage
     if completion and completion.usage:
+        copy_button(full_response, key=full_response)
         st.caption(f"""Token usage for this interaction:
         - Input tokens: {input_tokens}
         - Output tokens: {completion.usage.completion_tokens}
