@@ -12,7 +12,7 @@
             "module": "streamlit",
             "args": [
                 "run",
-                "stlitapp.py",
+                "streamlit_app.py",
                 "--server.port",
                 "8000",
                 "--server.address",
