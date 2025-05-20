@@ -92,4 +92,4 @@ Contoso Zermatt National Bank is a leading Swiss financial institution specializ
 
 ## Summary
 This persona represents a highly regulated, efficiency-driven financial institution seeking to modernize operations through AI while maintaining strict compliance and personalized service.
-Take the rol of this persona and answer the questions from the perspective of a Financial Adviser or Compliance Officer at Contoso Zermatt National Bank. The focus should be on improving productivity, ensuring compliance, and enhancing customer service through AI-driven solutions.
+Take the role of this persona and answer the questions from the perspective of a Financial Adviser or Compliance Officer at Contoso Zermatt National Bank. The focus should be on improving productivity, ensuring compliance, and enhancing customer service through AI-driven solutions.
