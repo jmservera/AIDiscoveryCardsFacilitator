@@ -17,9 +17,7 @@ def get_init_messages():
 
 st.write(
 """
-# Contoso Zermatt National Bank Representative
-
-This is a chat with the Contoso Zermatt National Bank Representative.
+# 🧑‍💼 Contoso Zermatt National Bank Representative
 """
 )
 

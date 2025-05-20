@@ -1,10 +1,13 @@
 import streamlit as st
 from time import sleep
 from streamlit.runtime.scriptrunner import get_script_run_ctx
+import pathlib
 
 import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
+
+CURRENT_DIR = pathlib.Path(__file__).parent.resolve()
 
 with open('./config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -30,14 +33,16 @@ def get_current_page_name():
 
 
 def make_sidebar():
+    st.logo(str(CURRENT_DIR) + "/assets/logo.png", size='medium')
+    st.set_page_config(layout="wide")
     with st.sidebar:
-        st.title("💎 AI Design Cards Facilitator")
+        st.subheader("🗂️ AI Discovery Cards")
         st.write("")
         st.write("")
 
         if st.session_state.get('authentication_status'):
-            st.page_link("pages/1_Facilitator.py", label="Facilitator", icon="🔒")
-            st.page_link("pages/2_Customer.py", label="Contoso Representative", icon="🕵️")
+            st.page_link("pages/1_Facilitator.py", label="Facilitator", icon="🧑‍🏫")
+            st.page_link("pages/2_Customer.py", label="Representative", icon="🧑‍💼")
 
             st.write("")
             st.write("")

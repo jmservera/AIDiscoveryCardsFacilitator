@@ -62,7 +62,7 @@ resource web 'Microsoft.Web/sites@2022-03-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'PYTHON|3.9'
+      linuxFxVersion: 'PYTHON|3.12'
       ftpsState: 'Disabled'
       appCommandLine: 'startup.sh'
     }
@@ -109,7 +109,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   name: 'app-${resourceToken}'
   location: location
   sku: {
-    name: 'F1'
+    name: 'B1'
   }
   kind: 'linux'
   properties: {

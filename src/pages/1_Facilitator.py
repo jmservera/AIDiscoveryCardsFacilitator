@@ -16,9 +16,7 @@ def get_init_messages():
 
 st.write(
 """
-# AI Discovery Cards Facilitator
-
-This is a simple chat interface for the AI Discovery Cards Facilitator.
+# 🧑‍🏫 AI Discovery Cards Facilitator
 """
 )
 
