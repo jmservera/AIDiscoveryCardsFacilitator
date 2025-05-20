@@ -4,6 +4,8 @@ import streamlit as st
 import openai
 import tiktoken
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from logging import getLogger
+import re
 
 from dotenv import load_dotenv
 import os
@@ -11,6 +13,7 @@ import os
 load_dotenv()
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 
+logger=getLogger()
 
 st.set_page_config(layout="wide")
 
@@ -69,9 +72,26 @@ def create_chat_completion(messages):
         #   }
       )
 
+
+def count_xml_tags(text):
+    # Define the regex pattern for XML tags
+    pattern = r'<[^>]+>'
+
+    # Find all matches in the text
+    matches = re.findall(pattern, text)
+
+    # Return the number of matches
+    return len(matches)
+
+
 def handle_chat_prompt(prompt):
     """Echo the user's prompt to the chat window.
     Then, send the user's prompt to Azure OpenAI and display the response."""
+
+    # Cleanup prompt
+    if count_xml_tags(prompt)>0:
+        # embed documents to avoid harm
+        prompt=f"<documents>{prompt}</documents>"
 
     # Echo the user's prompt to the chat window
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -91,8 +111,15 @@ def handle_chat_prompt(prompt):
         completion = None
         for response in create_chat_completion(st.session_state.messages):
             if response.choices:
-                full_response += (response.choices[0].delta.content or "")
-                message_placeholder.markdown(full_response + "▌")
+                try:
+                    if response.choices[0].delta != None:
+                        full_response += (response.choices[0].delta.content or "")
+                        message_placeholder.markdown(full_response + "▌")
+                    else:
+                        logger.debug(response.choices[0].model_dump_json())
+                except Exception as e:
+                    logger.exception(e)
+                    full_response += "An error happened, retry your request.\n"
             completion = response
         message_placeholder.markdown(full_response)
     
