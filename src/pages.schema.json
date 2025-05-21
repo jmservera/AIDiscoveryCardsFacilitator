@@ -1,0 +1,107 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Discovery Cards Agent Pages Schema",
+    "type": "object",
+    "properties": {
+        "sections": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "type",
+                                "persona",
+                                "document",
+                                "title",
+                                "icon",
+                                "url_path",
+                                "header",
+                                "subtitle"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "const": "agent"
+                                },
+                                "persona": {
+                                    "type": "string"
+                                },
+                                "document": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "icon": {
+                                    "type": "string"
+                                },
+                                "url_path": {
+                                    "type": "string"
+                                },
+                                "header": {
+                                    "type": "string"
+                                },
+                                "subtitle": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": false
+                        },
+                        {
+                            "type": "object",
+                            "required": [
+                                "type",
+                                "personas",
+                                "title",
+                                "icon",
+                                "url_path",
+                                "header",
+                                "subtitle"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "const": "multiagent"
+                                },
+                                "personas": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1
+                                },
+                                "documents": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "icon": {
+                                    "type": "string"
+                                },
+                                "url_path": {
+                                    "type": "string"
+                                },
+                                "header": {
+                                    "type": "string"
+                                },
+                                "subtitle": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "required": [
+        "sections"
+    ],
+    "additionalProperties": false
+}

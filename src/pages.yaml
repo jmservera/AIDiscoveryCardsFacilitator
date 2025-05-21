@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=./pages.schema.json
+# Pages configuration for Discovery Cards Agent
+# This file defines all available pages in the application
+#
+# Structure:
+# - sections: Top-level sections in the navigation
+# - pages: Individual pages within each section
+#   - type: Type of page ("agent", "multiagent", etc.)
+#   - persona: Path to the persona prompt file (for agent type)
+#   - personas: List of persona prompt files (for multiagent type)
+#   - document: Path to the content document file (for agent type)
+#   - documents: List of document files (optional for multiagent type)
+#   - title: Page title displayed in the navigation
+#   - icon: Emoji icon for the page
+#   - url_path: URL path segment for the page
+#   - header: Header title displayed at the top of the page
+#   - subtitle: Subtitle displayed below the header
+
+sections:
+  Main:
+    - type: agent
+      persona: prompts/facilitator_persona.md
+      document: prompts/ai_discovery_cards.md
+      title: Facilitator
+      icon: 🧑‍🏫
+      url_path: Facilitator
+      header: 🧑‍🏫 AI Discovery Cards Facilitator
+      subtitle: I'm your AI Design Thinking Expert and can guide you through the AI Discovery Cards Workshop step by step.
+
+    - type: agent
+      persona: prompts/customer_persona.md
+      document: prompts/contoso_zermatt_national_bank.md
+      title: Representative
+      icon: 🧑‍💼
+      url_path: Representative
+      header: 🧑‍💼 Contoso Zermatt National Bank Representative
+      subtitle: Ask me anything about our bank, internal processes and our day-to-day jobs.
