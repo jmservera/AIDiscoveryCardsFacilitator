@@ -1,4 +1,4 @@
 [client]
-showSidebarNavigation = false
+showSidebarNavigation = true
 toolbarMode = "minimal"
 showErrorDetails = "none"

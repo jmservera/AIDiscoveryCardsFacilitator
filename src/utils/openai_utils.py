@@ -173,9 +173,6 @@ def load_prompt_files(persona_file_path, content_file_path):
     with open(content_file_path, "r") as f:
         system_document = f.read()
     
-    # Determine the content label based on the file name
-    content_label = "Find the AI Discovery Cards definitions below" if "discovery" in content_file_path else "Find the use case below"
-    
     return [
         {
             "role": "system",
@@ -183,6 +180,6 @@ def load_prompt_files(persona_file_path, content_file_path):
         },
         {
             "role": "system",
-            "content": f"{content_label}:\n\n<documents>{system_document}</documents>"
+            "content": f"\n<documents>{system_document}</documents>"
         }
     ]

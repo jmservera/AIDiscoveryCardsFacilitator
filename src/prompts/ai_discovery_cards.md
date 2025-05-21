@@ -1,3 +1,5 @@
+Find the AI Discovery Cards definitions below
+
 # AI Discovery Cards
 
 These are the list of all the AI Discovery Cards that can be used in the AI Discovery Cards Workshop. Each card has a title, description, examples, services, and an optional category. The cards are organized into different categories based on their functionality. So, second level title is the main category and third level title is the card name. The description is a short summary of what the card does, the examples are real-world applications of the card, the services are the Microsoft services that can be used to implement the card, and the optional category is an additional categorization that can be used to further classify the card.
