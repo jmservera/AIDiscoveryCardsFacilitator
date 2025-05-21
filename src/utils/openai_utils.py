@@ -1,5 +1,26 @@
 """
 Utility functions for interacting with Azure OpenAI API
+
+This module provides a set of utilities to authenticate, communicate with, and process
+responses from Azure OpenAI services. It handles token management, message formatting,
+and streaming chat completions using Azure OpenAI's API.
+
+Key Features:
+- Authentication with Azure OpenAI using DefaultAzureCredential
+- Token counting and management for input and output messages
+- Streaming chat completions with proper error handling
+- Loading and formatting system prompts from files
+- XML tag detection and handling for document embedding
+
+Environment Variables:
+- AZURE_OPENAI_ENDPOINT: The endpoint URL for Azure OpenAI
+- AZURE_OPENAI_DEPLOYMENT_NAME: The deployment name to use (defaults to "gpt-4o")
+
+Dependencies:
+- openai: Main client for interacting with OpenAI API
+- azure.identity: For authentication with Azure
+- streamlit: For UI components and session management
+- tiktoken: For token counting
 """
 
 import os

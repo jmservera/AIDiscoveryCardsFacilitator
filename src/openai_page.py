@@ -1,3 +1,25 @@
+"""
+Streamlit page components for OpenAI-powered chat interfaces
+
+This module provides components and utilities for building interactive chat interfaces that
+communicate with Azure OpenAI. It handles the UI/UX aspects of the chat experience and
+delegates the AI interactions to the openai_utils module.
+
+Key Features:
+- Cached system message initialization
+- Dynamic chat page generation with customizable personas
+- Persistent chat history across page reloads
+- Integration with OpenAI's chat completion API
+
+Dependencies:
+- streamlit: For UI components and session management
+- st_copy: For adding copy buttons to chat messages
+- utils.openai_utils: For OpenAI interactions and prompt management
+
+The module works by creating agent pages with specific personas and document contexts
+that can be integrated into a multi-page Streamlit application.
+"""
+
 import streamlit as st
 from st_copy import copy_button
 
