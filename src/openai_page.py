@@ -121,12 +121,12 @@ def multiagent_page(
     return page
 
 
-def agent_page(persona: str, document: str, title: str, subtitle: str):
+def agent_page(persona: str, document: str, header: str, subtitle: str):
     """
     Create a Streamlit chat page for interacting with an agent persona.
 
     This function returns a page function that sets up a chatbot interface with a specific
-    persona and document context. The page includes a title, subtitle, and a chat history
+    persona and document context. The page includes a header, subtitle, and a chat history
     that persists across page reloads by storing it in the Streamlit session state.
 
     Parameters:
