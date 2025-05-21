@@ -33,7 +33,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
-from openai_page import create_page
+from openai_page import agent_page, create_page
 
 with open("./config.yaml", encoding="utf-8") as file:
     config = yaml.load(file, Loader=SafeLoader)
