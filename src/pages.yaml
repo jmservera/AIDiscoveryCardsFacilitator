@@ -26,6 +26,7 @@ sections:
       url_path: Facilitator
       header: 🧑‍🏫 AI Discovery Cards Facilitator
       subtitle: I'm your AI Design Thinking Expert and can guide you through the AI Discovery Cards Workshop step by step.
+      admin_only: true # Only visible to admins
 
     - type: agent
       persona: prompts/customer_persona.md

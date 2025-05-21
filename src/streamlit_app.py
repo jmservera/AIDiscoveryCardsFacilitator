@@ -75,11 +75,18 @@ try:
             with open("./pages.yaml", encoding="utf-8") as file:
                 pages_config = yaml.load(file, Loader=SafeLoader)
 
+            # Determine if the user is an admin
+            user_roles = st.session_state.get("roles")
+            is_admin = "admin" in user_roles
+
             # Convert YAML configuration to streamlit pages structure
             pages = {}
             for section, section_pages in pages_config["sections"].items():
                 pages[section] = []
                 for page_config in section_pages:
+                    # Hide admin_only pages for non-admins
+                    if page_config.get("admin_only", False) and not is_admin:
+                        continue
                     page_func = create_page(page_config)
                     page = st.Page(
                         page_func,
@@ -88,28 +95,13 @@ try:
                         url_path=page_config["url_path"],
                     )
                     pages[section].append(page)
+
+            pg = st.navigation(pages, position="sidebar")
+            authenticator.logout(location="sidebar", callback=clear)
+            pg.run()
         except (yaml.YAMLError, FileNotFoundError) as page_error:
             st.error(f"Error loading pages configuration: {page_error}")
-            # Fallback to a simple page if the configuration fails
-            pages = {
-                "Main": [
-                    st.Page(
-                        agent_page(
-                            "prompts/facilitator_persona.md",
-                            "prompts/ai_discovery_cards.md",
-                            "🧑‍🏫 AI Discovery Cards Facilitator",
-                            "I'm your AI Design Thinking Expert and can guide you through the AI Discovery Cards Workshop.",
-                        ),
-                        title="Facilitator",
-                        icon="🧑‍🏫",
-                        url_path="Facilitator",
-                    )
-                ]
-            }
 
-        pg = st.navigation(pages, position="sidebar")
-        authenticator.logout(location="sidebar", callback=clear)
-        pg.run()
     else:
         pg = st.navigation([login_page], position="hidden")
         pg.run()

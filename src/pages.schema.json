@@ -45,6 +45,9 @@
                                 },
                                 "subtitle": {
                                     "type": "string"
+                                },
+                                "admin_only": {
+                                    "type": "boolean"
                                 }
                             },
                             "additionalProperties": false
@@ -91,6 +94,9 @@
                                 },
                                 "subtitle": {
                                     "type": "string"
+                                },
+                                "admin_only": {
+                                    "type": "boolean"
                                 }
                             },
                             "additionalProperties": false
