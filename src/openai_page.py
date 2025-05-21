@@ -158,7 +158,7 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     """
 
     def page():
-        st.title(title)
+        st.title(header)
         st.subheader(subtitle)
 
         if "pages" not in st.session_state:
