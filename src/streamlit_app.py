@@ -29,17 +29,22 @@ try:
     authenticator.login()
     if st.session_state.get('authentication_status'):
         # todo generate pages from a yaml file...
-        pages={"Main":[             
-             st.Page( agent_page("prompts/facilitator_persona.md",
-                                    "prompts/ai_discovery_cards.md","""
-# 🧑‍🏫 AI Discovery Cards Facilitator
-I'm, your AI Design Thinking Expert and can guide you throuhg the AI Discovery Cards Workshop step by step.
-"""), title="Facilitator", icon="🧑‍🏫", url_path="Facilitator"),
-            st.Page(agent_page(        "prompts/customer_persona.md",
-                    "prompts/contoso_zermatt_national_bank.md","""
-# 🧑‍💼 Contoso Zermatt National Bank Representative
-Ask me anything about our bank, internal processes and our day-to-day jobs.
-"""), title= "Representative", icon="🧑‍💼", url_path="Representative")]}
+        pages={"Main":
+               [st.Page(
+                    agent_page(
+                         "prompts/facilitator_persona.md",
+                         "prompts/ai_discovery_cards.md",
+                         "🧑‍🏫 AI Discovery Cards Facilitator",
+                         "I'm, your AI Design Thinking Expert and can guide you throuhg the AI Discovery Cards Workshop step by step."),
+                    title="Facilitator", icon="🧑‍🏫", url_path="Facilitator"),
+                st.Page(
+                    agent_page(
+                         "prompts/customer_persona.md",
+                         "prompts/contoso_zermatt_national_bank.md",
+                         "🧑‍💼 Contoso Zermatt National Bank Representative",
+                         "Ask me anything about our bank, internal processes and our day-to-day jobs."),
+                    title= "Representative", icon="🧑‍💼", url_path="Representative")
+                ]}
 
         pg= st.navigation(pages)
         with st.sidebar:
