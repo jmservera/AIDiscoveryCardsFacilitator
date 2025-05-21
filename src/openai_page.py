@@ -188,55 +188,94 @@ def agent_page(persona: str, document: str, title: str, subtitle: str):
     return page
 
 
+class PageFactory:
+    """
+    Factory class for creating Streamlit chat pages based on configuration.
+    """
+
+    def __init__(self):
+        self._creators = {}
+
+    def register(self, page_type, creator):
+        """
+        Registers a new page creator for a specific page type.
+
+        Args:
+            page_type: The type or identifier of the page to associate with the creator.
+            creator: A callable or class responsible for creating instances of the specified page type.
+
+        Raises:
+            None explicitly, but may overwrite an existing creator for the given page_type.
+        """
+        self._creators[page_type] = creator
+
+    def create(self, page_config):
+        """
+        Creates a page instance based on the provided configuration.
+
+        Args:
+            page_config (dict): A dictionary containing the configuration for the page.
+                Expected keys include:
+                    - "type" (str, optional): The type of page to create. Defaults to "agent".
+                    - "persona" (str, optional): Path to the persona file. Used if type is "agent".
+                    - "document" (str, optional): Path to the document file. Used if type is "agent".
+                    - "header" (str): The header text for the page.
+                    - "subtitle" (str): The subtitle text for the page.
+
+        Returns:
+            object: An instance of the created page.
+
+        Notes:
+            If the specified page type is unknown, a warning is displayed and the default "agent" page is created using fallback values.
+        """
+        page_type = page_config.get("type", "agent")
+        creator = self._creators.get(page_type)
+        if creator:
+            return creator(page_config)
+        else:
+            st.warning(f"Unknown page type '{page_type}'. Using agent type as default.")
+            # Fallback to agent_page with defaults
+            return self._creators["agent"](
+                {
+                    "persona": page_config.get(
+                        "persona", "prompts/facilitator_persona.md"
+                    ),
+                    "document": page_config.get(
+                        "document", "prompts/ai_discovery_cards.md"
+                    ),
+                    "header": page_config["header"],
+                    "subtitle": page_config["subtitle"],
+                }
+            )
+
+
+# Register page types
+page_factory = PageFactory()
+
+# Adapter functions to match the expected signature
+page_factory.register(
+    "agent",
+    lambda cfg: agent_page(
+        cfg["persona"],
+        cfg["document"],
+        cfg["header"],
+        cfg["subtitle"],
+    ),
+)
+page_factory.register(
+    "multiagent",
+    lambda cfg: multiagent_page(
+        cfg["personas"],
+        cfg["header"],
+        cfg["subtitle"],
+        cfg.get("documents", None),
+    ),
+)
+
+
 def create_page(page_config):
     """
     Factory function to create the appropriate page based on configuration.
-
-    This function examines the page configuration and delegates to the appropriate
-    page creation function based on the specified type.
-
-    Parameters:
-    -----------
-    page_config : dict
-        A dictionary containing the page configuration from the YAML file.
-        Must contain at least 'type', 'header', and 'subtitle' keys.
-
-    Returns:
-    --------
-    function
-        A page function that can be called to render the appropriate chat interface.
-
-    Notes:
-    ------
-    This factory pattern makes it easy to extend the application with new page types
-    in the future without modifying the core application code.
+    Delegates to PageFactory for extensibility.
     """
-    page_type = page_config.get("type", "agent")  # Default to agent if not specified
-
-    if page_type == "agent":
-        return agent_page(
-            page_config["persona"],
-            page_config["document"],
-            page_config["header"],
-            page_config["subtitle"],
-        )
-    elif page_type == "multiagent":
-        # Handle optional documents list
-        documents = page_config.get("documents", None)
-        return multiagent_page(
-            page_config["personas"],
-            page_config["header"],
-            page_config["subtitle"],
-            documents,
-        )
-    else:
-        # For unknown types, log a warning and fall back to the agent page
-        import streamlit as st
-
-        st.warning(f"Unknown page type '{page_type}'. Using agent type as default.")
-        return agent_page(
-            page_config.get("persona", "prompts/facilitator_persona.md"),
-            page_config.get("document", "prompts/ai_discovery_cards.md"),
-            page_config["header"],
-            page_config["subtitle"],
-        )
+    return page_factory.create(page_config)

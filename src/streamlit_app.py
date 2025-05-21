@@ -41,7 +41,6 @@ with open("./config.yaml", encoding="utf-8") as file:
 CURRENT_DIR = pathlib.Path(__file__).parent.resolve()
 
 st.set_page_config(layout="wide")
-# page_icon=str(CURRENT_DIR) + "/assets/logo.png")
 # Pre-hashing all plain text passwords once
 # stauth.Hasher.hash_passwords(config['credentials'])
 

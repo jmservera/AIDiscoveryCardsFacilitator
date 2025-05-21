@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./pages.schema.json
 # Pages configuration for Discovery Cards Agent
 # This file defines all available pages in the application
 #
@@ -34,17 +35,3 @@ sections:
       url_path: Representative
       header: 🧑‍💼 Contoso Zermatt National Bank Representative
       subtitle: Ask me anything about our bank, internal processes and our day-to-day jobs.
-
-  Collaborative:
-    - type: multiagent
-      personas:
-        - prompts/facilitator_persona.md
-        - prompts/customer_persona.md
-      documents:
-        - prompts/ai_discovery_cards.md
-        - prompts/contoso_zermatt_national_bank.md
-      title: Workshop
-      icon: 👥
-      url_path: Workshop
-      header: 👥 Workshop Collaboration
-      subtitle: Work with both the facilitator and bank representative in a shared workspace.
