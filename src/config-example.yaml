@@ -1,0 +1,21 @@
+# Example configuration file for the AIDC Facilitator application auth
+# Change the password and rename the file to config.yaml
+# It will be automatically hashed during the first run
+api_key: null
+cookie:
+  expiry_days: 30
+  key: test-key-or-nothing
+  name: AIDCFacilitator
+credentials:
+  usernames:
+    admin:
+      email: username@domain.com
+      failed_login_attempts: 0
+      first_name: John
+      last_name: Doe
+      logged_in: false
+      password: admin
+      roles:
+        - admin
+        - editor
+        - viewer

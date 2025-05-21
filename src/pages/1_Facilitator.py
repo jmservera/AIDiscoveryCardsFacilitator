@@ -40,7 +40,8 @@ for message in page["messages"]:
         with st.chat_message(message["role"]):
             msg=message["content"]
             st.markdown(msg)
-            copy_button(msg, key=msg)
+            if message["role"] == "assistant":
+                copy_button(msg, key=msg)
 
 # Await a user message and handle the chat prompt when it comes in.
 if prompt := st.chat_input("Enter a message:"):
