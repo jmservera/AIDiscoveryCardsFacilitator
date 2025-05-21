@@ -51,8 +51,24 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"],
 )
 
-try:
+
+def clear(values):
+    """Clear the session state and redirect to the login page."""
+    for key in st.session_state.keys():
+        del st.session_state[key]
+
+
+def login_page():
+    """Render the login page."""
     authenticator.login()
+
+    if st.session_state.get("authentication_status") is False:
+        st.error("Username/password is incorrect")
+    elif st.session_state.get("authentication_status") is None:
+        st.warning("Please enter your username and password")
+
+
+try:
     if st.session_state.get("authentication_status"):
         # Load pages from pages.yaml file
         try:
@@ -91,14 +107,12 @@ try:
                 ]
             }
 
-        pg = st.navigation(pages)
-        with st.sidebar:
-            authenticator.logout()
+        pg = st.navigation(pages, position="sidebar")
+        authenticator.logout(location="sidebar", callback=clear)
         pg.run()
-    elif st.session_state.get("authentication_status") is False:
-        st.error("Username/password is incorrect")
-    elif st.session_state.get("authentication_status") is None:
-        st.warning("Please enter your username and password")
+    else:
+        pg = st.navigation([login_page], position="hidden")
+        pg.run()
     with open("./config.yaml", "w", encoding="utf-8") as file:
         yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
 except (
