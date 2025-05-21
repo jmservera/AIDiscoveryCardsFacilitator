@@ -18,6 +18,7 @@ def get_init_messages():
 st.write(
 """
 # 🧑‍🏫 AI Discovery Cards Facilitator
+I'm, your AI Design Thinking Expert and can guide you throuhg the AI Discovery Cards Workshop step by step.
 """
 )
 

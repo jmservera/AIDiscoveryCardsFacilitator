@@ -19,6 +19,7 @@ def get_init_messages():
 st.write(
 """
 # 🧑‍💼 Contoso Zermatt National Bank Representative
+Ask me anything about our bank, internal processes and our day-to-day jobs.
 """
 )
 
