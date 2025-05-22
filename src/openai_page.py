@@ -190,6 +190,28 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
 
 
 def agent_page_from_key(agent_key: str, header: str, subtitle: str):
+    """
+    Create an agent page using the agent key to look up the agent's configuration.
+
+    Parameters:
+    -----------
+    agent_key : str
+        The key of the agent to look up in the agent registry.
+    header : str
+        The header title to display at the top of the page.
+    subtitle : str
+        The subtitle to display below the header.
+
+    Returns:
+    --------
+    function
+        A page function that can be called to render the chat interface.
+
+    Raises:
+    -------
+    ValueError
+        If the agent key is not found in the registry.
+    """
     agent = agent_registry.get(agent_key)
     if not agent:
         raise ValueError(f"Agent '{agent_key}' not found in registry.")
@@ -199,43 +221,58 @@ def agent_page_from_key(agent_key: str, header: str, subtitle: str):
 class PageFactory:
     """
     Factory class for creating Streamlit chat pages based on configuration.
+
+    This class allows registering different page types and their corresponding
+    creation logic. It supports extensibility by enabling new page types to be
+    added dynamically.
     """
 
     def __init__(self):
+        """
+        Initialize the PageFactory with an empty registry of page creators.
+        """
         self._creators = {}
 
     def register(self, page_type, creator):
         """
-        Registers a new page creator for a specific page type.
+        Register a new page creator for a specific page type.
 
-        Args:
-            page_type: The type or identifier of the page to associate with the creator.
-            creator: A callable or class responsible for creating instances of the specified page type.
+        Parameters:
+        -----------
+        page_type : str
+            The type or identifier of the page to associate with the creator.
+        creator : callable
+            A callable or class responsible for creating instances of the specified page type.
 
-        Raises:
-            None explicitly, but may overwrite an existing creator for the given page_type.
+        Notes:
+        ------
+        If a creator is already registered for the given page type, it will be overwritten.
         """
         self._creators[page_type] = creator
 
     def create(self, page_config):
         """
-        Creates a page instance based on the provided configuration.
+        Create a page instance based on the provided configuration.
 
-        Args:
-            page_config (dict): A dictionary containing the configuration for the page.
-                Expected keys include:
-                    - "type" (str, optional): The type of page to create. Defaults to "agent".
-                    - "persona" (str, optional): Path to the persona file. Used if type is "agent".
-                    - "document" (str, optional): Path to the document file. Used if type is "agent".
-                    - "header" (str): The header text for the page.
-                    - "subtitle" (str): The subtitle text for the page.
+        Parameters:
+        -----------
+        page_config : dict
+            A dictionary containing the configuration for the page.
+            Expected keys include:
+                - "type" (str, optional): The type of page to create. Defaults to "agent".
+                - "agent" (str, optional): The key of the agent to use for the page.
+                - "header" (str): The header text for the page.
+                - "subtitle" (str): The subtitle text for the page.
 
         Returns:
-            object: An instance of the created page.
+        --------
+        function
+            An instance of the created page.
 
         Notes:
-            If the specified page type is unknown, a warning is displayed and the default "agent"
-            page is created using fallback values.
+        ------
+        If the specified page type is unknown, a warning is displayed and the default "agent"
+        page is created using fallback values.
         """
         page_type = page_config.get("type", "agent")
         creator = self._creators.get(page_type)
