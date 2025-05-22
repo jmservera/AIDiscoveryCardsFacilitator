@@ -34,7 +34,8 @@ from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 import semantic_kernel as sk
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
+from semantic_kernel.connectors.ai.open_ai.services.azure_chat_completion import AzureChatCompletion
+from semantic_kernel.connectors.ai.open_ai.prompt_execution_settings.azure_chat_prompt_execution_settings import AzureChatPromptExecutionSettings
 from semantic_kernel.contents.chat_history import ChatHistory
 
 # Configure logging
@@ -173,7 +174,7 @@ class AgentCore:
             endpoint=AZURE_OPENAI_ENDPOINT,
             api_version="2024-06-01",
             api_key=None,
-            ad_token=token_provider,
+            ad_token=token_provider(),
         )
         
         # Add the service to the kernel
@@ -246,9 +247,9 @@ class AgentCore:
         
         # Create the chat completion request
         # We need to stream the response manually to match the expected format
-        completion_request = self.chat_service.get_chat_completion_async(
+        completion_request = self.chat_service.get_streaming_chat_message_content(
             chat_history=chat_history,
-            settings=sk.ChatPromptExecutionSettings(
+            settings=AzureChatPromptExecutionSettings(
                 service_id=self.chat_service.service_id,
                 temperature=0.7,
                 max_tokens=4096,
@@ -259,16 +260,16 @@ class AgentCore:
         # Prepare stream-like responses
         async def process_completion():
             try:
-                streaming_result = await completion_request
-                async for chunk in streaming_result.choices[0].stream():
+                async for chunk in completion_request:
+                    content = chunk.content if hasattr(chunk, 'content') else ""
                     usage = None
-                    if hasattr(streaming_result, 'usage') and streaming_result.usage:
-                        usage = streaming_result.usage
+                    if hasattr(chunk, 'metadata') and hasattr(chunk.metadata, 'usage'):
+                        usage = chunk.metadata.usage
                     
                     yield {
                         "choices": [
                             {
-                                "delta": {"content": chunk},
+                                "delta": {"content": content},
                                 "index": 0,
                                 "finish_reason": None,
                             }
@@ -276,7 +277,7 @@ class AgentCore:
                         "usage": usage,
                     }
                 
-                # Final chunk with complete usage information
+                # Final chunk with finish reason
                 yield {
                     "choices": [
                         {
@@ -285,7 +286,7 @@ class AgentCore:
                             "finish_reason": "stop",
                         }
                     ],
-                    "usage": streaming_result.usage,
+                    "usage": None,
                 }
             
             except Exception as e:
