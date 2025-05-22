@@ -160,12 +160,12 @@ def multiagent_page(
                 copy_button(result["response"], key=result["response"])
                 
                 # Display token usage if available
-                if result.get("completion") and result["completion"].get("usage"):
+                if result.get("usage_info"):
                     st.caption(
                         f"""Token usage for this interaction:
                     - Input tokens: {result["input_tokens"]}
-                    - Output tokens: {result["completion"]["usage"].completion_tokens}
-                    - Total tokens: {result["completion"]["usage"].total_tokens}"""
+                    - Output tokens: {result["usage_info"].completion_tokens if hasattr(result["usage_info"], "completion_tokens") else "N/A"}
+                    - Total tokens: {result["usage_info"].total_tokens if hasattr(result["usage_info"], "total_tokens") else "N/A"}"""
                     )
 
     return page
@@ -252,12 +252,12 @@ def agent_page(
                 copy_button(result["response"], key=result["response"])
                 
                 # Display token usage if available
-                if result.get("completion") and result["completion"].get("usage"):
+                if result.get("usage_info"):
                     st.caption(
                         f"""Token usage for this interaction:
                     - Input tokens: {result["input_tokens"]}
-                    - Output tokens: {result["completion"]["usage"].completion_tokens}
-                    - Total tokens: {result["completion"]["usage"].total_tokens}"""
+                    - Output tokens: {result["usage_info"].completion_tokens if hasattr(result["usage_info"], "completion_tokens") else "N/A"}
+                    - Total tokens: {result["usage_info"].total_tokens if hasattr(result["usage_info"], "total_tokens") else "N/A"}"""
                     )
 
     return page

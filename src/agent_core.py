@@ -222,14 +222,14 @@ class AgentCore:
     
     def create_chat_completion(
         self, messages: List[Dict[str, str]]
-    ) -> Generator[Dict[str, Any], None, None]:
+    ) -> Generator[Any, None, None]:
         """Create a chat completion using Semantic Kernel.
         
         Args:
             messages: List of message objects with role and content
             
         Yields:
-            Response chunks from the chat completion
+            Response chunks directly from Semantic Kernel's streaming API
         """
         # Convert the message format to Semantic Kernel's format
         chat_history = ChatHistory()
@@ -245,8 +245,7 @@ class AgentCore:
             elif role == "assistant":
                 chat_history.add_assistant_message(content)
         
-        # Create the chat completion request
-        # We need to stream the response manually to match the expected format
+        # Create the chat completion request with streaming enabled
         completion_request = self.chat_service.get_streaming_chat_message_content(
             chat_history=chat_history,
             settings=AzureChatPromptExecutionSettings(
@@ -257,57 +256,21 @@ class AgentCore:
             ),
         )
         
-        # Prepare stream-like responses
-        async def process_completion():
-            try:
-                async for chunk in completion_request:
-                    content = chunk.content if hasattr(chunk, 'content') else ""
-                    usage = None
-                    if hasattr(chunk, 'metadata') and hasattr(chunk.metadata, 'usage'):
-                        usage = chunk.metadata.usage
-                    
-                    yield {
-                        "choices": [
-                            {
-                                "delta": {"content": content},
-                                "index": 0,
-                                "finish_reason": None,
-                            }
-                        ],
-                        "usage": usage,
-                    }
-                
-                # Final chunk with finish reason
-                yield {
-                    "choices": [
-                        {
-                            "delta": {"content": None},
-                            "index": 0, 
-                            "finish_reason": "stop",
-                        }
-                    ],
-                    "usage": None,
-                }
-            
-            except Exception as e:
-                logger.exception("Error in chat completion: %s", e)
-                yield {
-                    "choices": [
-                        {
-                            "delta": {"content": "\nAn error occurred during processing. Please try again."},
-                            "index": 0,
-                            "finish_reason": "error",
-                        }
-                    ],
-                    "usage": None,
-                }
-        
-        # Use asyncio to run the async function and convert to generator
+        # Use asyncio to run the async generator and convert to sync generator
         import asyncio
         
         async def run_async_generator():
-            async for item in process_completion():
-                yield item
+            try:
+                async for chunk in completion_request:
+                    yield chunk
+            except Exception as e:
+                logger.exception("Error in chat completion: %s", e)
+                # Create a simple error message chunk
+                error_chunk = type('ErrorChunk', (), {
+                    'content': "\nAn error occurred during processing. Please try again.",
+                    'metadata': None
+                })
+                yield error_chunk
         
         # Convert async generator to sync generator
         def sync_generator():
@@ -350,15 +313,17 @@ class AgentCore:
         
         # Send the prompt to the LLM
         full_response = ""
-        completion = None
+        usage_info = None
         
         try:
-            for response in self.create_chat_completion(page["messages"]):
-                if response.get("choices") and len(response["choices"]) > 0:
-                    delta = response["choices"][0].get("delta", {})
-                    if delta and delta.get("content") is not None:
-                        full_response += delta["content"] or ""
-                completion = response
+            for chunk in self.create_chat_completion(page["messages"]):
+                if hasattr(chunk, 'content') and chunk.content is not None:
+                    full_response += chunk.content
+                
+                # Check for usage information in the chunk metadata
+                if hasattr(chunk, 'metadata') and chunk.metadata:
+                    if hasattr(chunk.metadata, 'usage'):
+                        usage_info = chunk.metadata.usage
         except Exception as e:
             logger.exception("Error processing chat completion: %s", e)
             full_response = "An error occurred while processing your request. Please try again."
@@ -370,7 +335,7 @@ class AgentCore:
         result = {
             "response": full_response,
             "input_tokens": input_tokens,
-            "completion": completion
+            "usage_info": usage_info
         }
         
         return result

@@ -76,18 +76,15 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        completion = None
+        completion_usage = None
         
         try:
             for response in agent_core.create_chat_completion(page["messages"]):
-                if response.get("choices") and len(response["choices"]) > 0:
-                    delta = response["choices"][0].get("delta", {})
-                    if delta and delta.get("content") is not None:
-                        full_response += delta["content"] or ""
-                        message_placeholder.markdown(full_response + "▌")
-                    else:
-                        logger.debug(str(response))
-                completion = response
+                if hasattr(response, 'content') and response.content is not None:
+                    full_response += response.content
+                    message_placeholder.markdown(full_response + "▌")
+                if hasattr(response, 'metadata') and response.metadata and hasattr(response.metadata, 'usage'):
+                    completion_usage = response.metadata.usage
             message_placeholder.markdown(full_response)
         except Exception as e:
             logger.exception("Error processing response: %s", e)
@@ -98,12 +95,12 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
     page["messages"].append({"role": "assistant", "content": full_response})
 
     # Display token usage
-    if completion and completion.get("usage"):
+    if completion_usage:
         from st_copy import copy_button
         copy_button(full_response, key=full_response)
         st.caption(
             f"""Token usage for this interaction:
         - Input tokens: {input_tokens}
-        - Output tokens: {completion["usage"].completion_tokens}
-        - Total tokens: {completion["usage"].total_tokens}"""
+        - Output tokens: {completion_usage.completion_tokens if hasattr(completion_usage, 'completion_tokens') else 'N/A'}
+        - Total tokens: {completion_usage.total_tokens if hasattr(completion_usage, 'total_tokens') else 'N/A'}"""
         )
