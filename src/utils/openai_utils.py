@@ -14,7 +14,6 @@ Dependencies:
 - streamlit: For UI components and session management
 """
 
-import logging
 import re
 from typing import Dict, List, Optional, Union
 
