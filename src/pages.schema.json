@@ -13,11 +13,20 @@
                     },
                     "document": {
                         "type": "string"
+                    },
+                    "documents": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     }
                 },
                 "required": [
-                    "persona",
-                    "document"
+                    "persona"
+                ],
+                "oneOf": [
+                    { "required": ["document"] },
+                    { "required": ["documents"] }
                 ],
                 "additionalProperties": false
             }

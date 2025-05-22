@@ -33,21 +33,51 @@ from utils.openai_utils import handle_chat_prompt, load_prompt_files
 
 
 @st.cache_data
-def get_system_messages(persona: str, document: str):
-    """Return the initial messages for the chat history."""
-    return load_prompt_files(persona, document)
+def get_system_messages(persona: str, documents=None):
+    """
+    Return the initial messages for the chat history.
+    
+    Parameters:
+    -----------
+    persona : str
+        Path to the persona prompt file.
+    documents : str or list[str], optional
+        Path(s) to document file(s) to use as context. Can be a single string or a list of strings.
+    
+    Returns:
+    --------
+    list
+        List of message objects with the system prompts loaded.
+    """
+    return load_prompt_files(persona, documents)
 
 
 @st.cache_data
 def get_system_messages_multiagent(personas: list[str], documents: list[str] = None):
-    """Return the initial messages for a multi-agent chat history.
+    """
+    Return the initial messages for a multi-agent chat history.
 
-    If documents are not provided, only persona prompts will be used.
+    Parameters:
+    -----------
+    personas : list[str]
+        List of paths to persona prompt files.
+    documents : list[str], optional
+        List of paths to document files. If provided, each document is paired with the 
+        corresponding persona. If a persona needs multiple documents, provide a list of lists.
+
+    Returns:
+    --------
+    list
+        Combined list of message objects for all personas with their documents.
     """
     messages = []
     for i, persona in enumerate(personas):
-        doc = documents[i] if documents and i < len(documents) else ""
-        persona_messages = load_prompt_files(persona, doc)
+        # Handle document pairing for this persona
+        persona_docs = None
+        if documents and i < len(documents):
+            persona_docs = documents[i]
+        
+        persona_messages = load_prompt_files(persona, persona_docs)
         messages.extend(persona_messages)
     return messages
 
@@ -122,7 +152,7 @@ def multiagent_page(
     return page
 
 
-def agent_page(persona: str, document: str, header: str, subtitle: str):
+def agent_page(persona: str, documents=None, header: str=None, subtitle: str=None):
     """
     Create a Streamlit chat page for interacting with an agent persona.
 
@@ -134,12 +164,13 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     -----------
     persona : str
         The persona or role prompt file name that the assistant should adopt in the conversation.
-    document : str
-        The document or context file that the assistant should use as reference.
-    title : str
-        The title to display at the top of the page.
+    documents : str or list[str], optional
+        The document or context file(s) that the assistant should use as reference.
+        Can be a single file path or a list of file paths.
+    header : str
+        The header text to display at the top of the page.
     subtitle : str
-        The subtitle to display below the title.
+        The subtitle text to display below the header.
 
     Returns:
     --------
@@ -149,8 +180,7 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     Notes:
     ------
     The function relies on several external dependencies:
-    - get_system_messages(): From the openai_utils module.
-                             Expected to initialize the chat with system messages
+    - get_system_messages(): For initializing the chat with system messages
     - handle_chat_prompt(): From the openai_utils module.
                             Expected to process user inputs and generate responses
     - copy_button(): Expected to add a copy button to assistant messages
@@ -171,7 +201,7 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
         page = st.session_state.pages[st.context.url]
         # Initialize chat history
         if "messages" not in page:
-            page["messages"] = get_system_messages(persona, document)
+            page["messages"] = get_system_messages(persona, documents)
 
         # Display chat messages from history on app rerun
         for message in page["messages"]:
@@ -215,7 +245,18 @@ def agent_page_from_key(agent_key: str, header: str, subtitle: str):
     agent = agent_registry.get(agent_key)
     if not agent:
         raise ValueError(f"Agent '{agent_key}' not found in registry.")
-    return agent_page(agent["persona"], agent["document"], header, subtitle)
+    
+    # Get the persona path
+    persona = agent["persona"]
+    
+    # Get document(s) - could be a single document or a list
+    documents = None
+    if "document" in agent:
+        documents = agent["document"]
+    elif "documents" in agent:
+        documents = agent["documents"]
+    
+    return agent_page(persona, documents, header, subtitle)
 
 
 class PageFactory:
@@ -310,7 +351,7 @@ page_factory.register(
         if "agent" in cfg
         else agent_page(
             cfg["persona"],
-            cfg["document"],
+            cfg.get("documents", cfg.get("document")),  # Try documents first, then document
             cfg["header"],
             cfg["subtitle"],
         )

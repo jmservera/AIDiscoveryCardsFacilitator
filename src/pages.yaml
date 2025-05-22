@@ -26,6 +26,11 @@ agents:
   andermatt_works:
     persona: prompts/contoso_andermatt_works_persona.md
     document: prompts/contoso_andermatt_works.md
+  multi_doc_expert:
+    persona: prompts/facilitator_persona.md
+    documents:
+      - prompts/ai_discovery_cards.md
+      - prompts/contoso_zermatt_national_bank.md
 
 sections:
   Coach:
@@ -53,3 +58,11 @@ sections:
       url_path: AndermattWorks
       header: 🏗️ Contoso Andermatt Works Representative
       subtitle: Ask me anything about our construction company, internal processes and our day-to-day jobs.
+      
+    - type: agent
+      agent: multi_doc_expert
+      title: Multi-Doc Expert
+      icon: 📚
+      url_path: MultiDocExpert
+      header: 📚 Multi-Document Expert
+      subtitle: I'm grounded in multiple documents to demonstrate the multi-document capability.
