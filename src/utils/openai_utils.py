@@ -14,10 +14,10 @@ Dependencies:
 - streamlit: For UI components and session management
 """
 
-import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, List
 
 import streamlit as st
+from st_copy import copy_button
 from streamlit.logger import get_logger
 
 from agent_core import agent_core, count_tokens, count_xml_tags
@@ -28,12 +28,12 @@ logger = get_logger(__name__)
 
 def create_chat_completion(messages: List[Dict[str, str]]):
     """Create and return a new chat completion request.
-    
+
     This is a compatibility function that delegates to agent_core.
-    
+
     Args:
         messages: List of message objects with role and content
-        
+
     Returns:
         A streaming response from the LLM
     """
@@ -46,7 +46,7 @@ def create_chat_completion(messages: List[Dict[str, str]]):
 
 def handle_chat_prompt(prompt: str, page: Dict) -> None:
     """Process a user prompt, send to LLM and display the response.
-    
+
     This is a compatibility function that delegates to agent_core.
 
     Args:
@@ -76,13 +76,17 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
         message_placeholder = st.empty()
         full_response = ""
         completion_usage = None
-        
+
         try:
             for response in agent_core.create_chat_completion(page["messages"]):
-                if hasattr(response, 'content') and response.content is not None:
+                if hasattr(response, "content") and response.content is not None:
                     full_response += response.content
                     message_placeholder.markdown(full_response + "▌")
-                if hasattr(response, 'metadata') and response.metadata and hasattr(response.metadata, 'usage'):
+                if (
+                    hasattr(response, "metadata")
+                    and response.metadata
+                    and hasattr(response.metadata, "usage")
+                ):
                     completion_usage = response.metadata.usage
             message_placeholder.markdown(full_response)
         except Exception as e:
@@ -95,7 +99,7 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
 
     # Display token usage
     if completion_usage:
-        from st_copy import copy_button
+
         copy_button(full_response, key=full_response)
         st.caption(
             f"""Token usage for this interaction:

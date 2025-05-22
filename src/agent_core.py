@@ -28,7 +28,6 @@ import os
 import re
 from typing import Any, Dict, Generator, List, Optional, Union
 
-import openai
 import semantic_kernel as sk
 import tiktoken
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
