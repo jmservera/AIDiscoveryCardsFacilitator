@@ -28,6 +28,7 @@ that can be integrated into a multi-page Streamlit application.
 import streamlit as st
 from st_copy import copy_button
 
+from agent_registry import agent_registry
 from utils.openai_utils import handle_chat_prompt, load_prompt_files
 
 
@@ -188,6 +189,13 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     return page
 
 
+def agent_page_from_key(agent_key: str, header: str, subtitle: str):
+    agent = agent_registry.get(agent_key)
+    if not agent:
+        raise ValueError(f"Agent '{agent_key}' not found in registry.")
+    return agent_page(agent["persona"], agent["document"], header, subtitle)
+
+
 class PageFactory:
     """
     Factory class for creating Streamlit chat pages based on configuration.
@@ -256,11 +264,19 @@ page_factory = PageFactory()
 # Adapter functions to match the expected signature
 page_factory.register(
     "agent",
-    lambda cfg: agent_page(
-        cfg["persona"],
-        cfg["document"],
-        cfg["header"],
-        cfg["subtitle"],
+    lambda cfg: (
+        agent_page_from_key(
+            cfg["agent"],
+            cfg["header"],
+            cfg["subtitle"],
+        )
+        if "agent" in cfg
+        else agent_page(
+            cfg["persona"],
+            cfg["document"],
+            cfg["header"],
+            cfg["subtitle"],
+        )
     ),
 )
 page_factory.register(
