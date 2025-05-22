@@ -25,6 +25,7 @@ Dependencies:
 
 import os
 import re
+from typing import Dict, List, Optional, Union
 
 import openai
 import streamlit as st
@@ -61,12 +62,11 @@ def get_client() -> openai.AzureOpenAI:
     )
 
 
-def create_chat_completion(messages):
+def create_chat_completion(messages: List[Dict[str, str]]) -> openai.Stream:
     """Create and return a new chat completion request.
 
     Args:
         messages: List of message objects with role and content
-        azure_openai_endpoint: Azure OpenAI endpoint URL
 
     Returns:
         A streaming response from Azure OpenAI
@@ -83,7 +83,7 @@ def create_chat_completion(messages):
     )
 
 
-def count_tokens(messages):
+def count_tokens(messages: List[Dict[str, str]]) -> int:
     """Count the number of tokens in the messages.
 
     Args:
@@ -105,7 +105,7 @@ def count_tokens(messages):
     return num_tokens
 
 
-def count_xml_tags(text):
+def count_xml_tags(text: str) -> int:
     """Count the number of XML tags in a string.
 
     Args:
@@ -124,12 +124,12 @@ def count_xml_tags(text):
     return len(matches)
 
 
-def handle_chat_prompt(prompt, page):
+def handle_chat_prompt(prompt: str, page: Dict) -> None:
     """Process a user prompt, send to Azure OpenAI and display the response.
 
     Args:
         prompt: The user's text input
-        st_session_state: Streamlit session state object containing messages
+        page: Dictionary containing page state including messages history
 
     Returns:
         None - updates the session state and UI directly
@@ -161,8 +161,8 @@ def handle_chat_prompt(prompt, page):
                         message_placeholder.markdown(full_response + "▌")
                     else:
                         logger.debug(response.choices[0].model_dump_json())
-                except Exception as e:
-                    logger.exception(e)
+                except (AttributeError, IndexError) as e:
+                    logger.exception("Error processing response: %s", e)
                     full_response += "An error happened, retry your request.\n"
             completion = response
         message_placeholder.markdown(full_response)
@@ -181,7 +181,9 @@ def handle_chat_prompt(prompt, page):
         )
 
 
-def load_prompt_files(persona_file_path, content_file_paths=None):
+def load_prompt_files(
+    persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
+) -> List[Dict[str, str]]:
     """Load content from prompt files and create initial messages.
 
     Args:
@@ -217,7 +219,7 @@ def load_prompt_files(persona_file_path, content_file_paths=None):
                             "content": f"\n<documents>{system_document}</documents>",
                         }
                     )
-            except Exception as e:
-                logger.exception(f"Error loading document file {file_path}: {e}")
+            except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
+                logger.exception("Error loading document file %s: %s", file_path, e)
 
     return messages

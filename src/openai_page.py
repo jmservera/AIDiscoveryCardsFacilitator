@@ -25,6 +25,8 @@ The module works by creating agent pages with specific personas and document con
 that can be integrated into a multi-page Streamlit application.
 """
 
+from typing import Callable, Dict, List, Optional, Union
+
 import streamlit as st
 from st_copy import copy_button
 
@@ -33,7 +35,9 @@ from utils.openai_utils import handle_chat_prompt, load_prompt_files
 
 
 @st.cache_data
-def get_system_messages(persona: str, documents=None):
+def get_system_messages(
+    persona: str, documents: Optional[Union[str, List[str]]] = None
+) -> List[Dict[str, str]]:
     """
     Return the initial messages for the chat history.
 
@@ -46,14 +50,16 @@ def get_system_messages(persona: str, documents=None):
 
     Returns:
     --------
-    list
+    list[dict[str, str]]
         List of message objects with the system prompts loaded.
     """
     return load_prompt_files(persona, documents)
 
 
 @st.cache_data
-def get_system_messages_multiagent(personas: list[str], documents: list[str] = None):
+def get_system_messages_multiagent(
+    personas: List[str], documents: Optional[List[str]] = None
+) -> List[Dict[str, str]]:
     """
     Return the initial messages for a multi-agent chat history.
 
@@ -67,7 +73,7 @@ def get_system_messages_multiagent(personas: list[str], documents: list[str] = N
 
     Returns:
     --------
-    list
+    list[dict[str, str]]
         Combined list of message objects for all personas with their documents.
     """
     messages = []
@@ -83,8 +89,11 @@ def get_system_messages_multiagent(personas: list[str], documents: list[str] = N
 
 
 def multiagent_page(
-    personas: list[str], title: str, subtitle: str, documents: list[str] = None
-):
+    personas: List[str],
+    title: str,
+    subtitle: str,
+    documents: Optional[List[str]] = None,
+) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with multiple agent personas.
 
@@ -121,7 +130,7 @@ def multiagent_page(
     The chat history is stored in st.session_state.pages keyed by the current URL.
     """
 
-    def page():
+    def page() -> None:
         st.title(title)
         st.subheader(subtitle)
 
@@ -152,7 +161,12 @@ def multiagent_page(
     return page
 
 
-def agent_page(persona: str, documents=None, header: str = None, subtitle: str = None):
+def agent_page(
+    persona: str,
+    documents: Optional[Union[str, List[str]]] = None,
+    header: Optional[str] = None,
+    subtitle: Optional[str] = None,
+) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with an agent persona.
 
@@ -167,9 +181,9 @@ def agent_page(persona: str, documents=None, header: str = None, subtitle: str =
     documents : str or list[str], optional
         The document or context file(s) that the assistant should use as reference.
         Can be a single file path or a list of file paths.
-    header : str
+    header : str, optional
         The header text to display at the top of the page.
-    subtitle : str
+    subtitle : str, optional
         The subtitle text to display below the header.
 
     Returns:
@@ -188,7 +202,7 @@ def agent_page(persona: str, documents=None, header: str = None, subtitle: str =
     The chat history is stored in st.session_state.pages keyed by the current URL.
     """
 
-    def page():
+    def page() -> None:
         st.title(header)
         st.subheader(subtitle)
 
@@ -219,7 +233,9 @@ def agent_page(persona: str, documents=None, header: str = None, subtitle: str =
     return page
 
 
-def agent_page_from_key(agent_key: str, header: str, subtitle: str):
+def agent_page_from_key(
+    agent_key: str, header: str, subtitle: str
+) -> Callable[[], None]:
     """
     Create an agent page using the agent key to look up the agent's configuration.
 
@@ -274,7 +290,7 @@ class PageFactory:
         """
         self._creators = {}
 
-    def register(self, page_type, creator):
+    def register(self, page_type: str, creator: Callable[[Dict], Callable]) -> None:
         """
         Register a new page creator for a specific page type.
 
@@ -291,7 +307,7 @@ class PageFactory:
         """
         self._creators[page_type] = creator
 
-    def create(self, page_config):
+    def create(self, page_config: Dict) -> Callable[[], None]:
         """
         Create a page instance based on the provided configuration.
 
@@ -370,9 +386,19 @@ page_factory.register(
 )
 
 
-def create_page(page_config):
+def create_page(page_config: Dict) -> Callable[[], None]:
     """
     Factory function to create the appropriate page based on configuration.
     Delegates to PageFactory for extensibility.
+
+    Parameters:
+    -----------
+    page_config : dict
+        A dictionary containing the configuration for the page.
+
+    Returns:
+    --------
+    function
+        An instance of the created page.
     """
     return page_factory.create(page_config)

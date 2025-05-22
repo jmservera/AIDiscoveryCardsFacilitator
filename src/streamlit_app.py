@@ -27,6 +27,7 @@ format.
 """
 
 import pathlib
+from typing import Any
 
 import streamlit as st
 import streamlit_authenticator as stauth
@@ -52,13 +53,13 @@ authenticator = stauth.Authenticate(
 )
 
 
-def clear(_):
+def clear(_: Any) -> None:
     """Clear the session state and redirect to the login page."""
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
 
-def login_page():
+def login_page() -> None:
     """Render the login page."""
     authenticator.login()
 

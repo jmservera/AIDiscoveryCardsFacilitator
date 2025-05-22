@@ -15,6 +15,7 @@ agent_registry:
 """
 
 from pathlib import Path
+from typing import Dict, Optional
 
 import yaml
 
@@ -37,7 +38,7 @@ class AgentRegistry:
         Returns all agent definitions as a dictionary.
     """
 
-    def __init__(self, pages_file=PAGES_FILE):
+    def __init__(self, pages_file: Path = PAGES_FILE) -> None:
         """
         Initialize the AgentRegistry by loading agent definitions from the YAML file.
 
@@ -49,7 +50,7 @@ class AgentRegistry:
         with open(pages_file, encoding="utf-8") as f:
             self._agents = yaml.safe_load(f)["agents"]
 
-    def get(self, agent_key):
+    def get(self, agent_key: str) -> Optional[Dict]:
         """
         Retrieve the definition of a specific agent by its key.
 
@@ -65,7 +66,7 @@ class AgentRegistry:
         """
         return self._agents.get(agent_key)
 
-    def all(self):
+    def all(self) -> Dict:
         """
         Retrieve all agent definitions.
 
