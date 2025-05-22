@@ -274,18 +274,13 @@ class AgentCore:
         
         # Convert async generator to sync generator
         def sync_generator():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            agen = run_async_generator()
             
-            try:
-                agen = run_async_generator()
-                while True:
-                    try:
-                        yield loop.run_until_complete(agen.__anext__())
-                    except StopAsyncIteration:
-                        break
-            finally:
-                loop.close()
+            while True:
+                try:
+                    yield asyncio.run(agen.__anext__())
+                except StopAsyncIteration:
+                    break
         
         return sync_generator()
     
