@@ -33,7 +33,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
-from openai_page import agent_page, create_page
+from openai_page import create_page
 
 with open("./config.yaml", encoding="utf-8") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -52,7 +52,7 @@ authenticator = stauth.Authenticate(
 )
 
 
-def clear(values):
+def clear(_):
     """Clear the session state and redirect to the login page."""
     for key in list(st.session_state.keys()):
         del st.session_state[key]
@@ -82,11 +82,14 @@ try:
             # Convert YAML configuration to streamlit pages structure
             pages = {}
             for section, section_pages in pages_config["sections"].items():
-                pages[section] = []
+                IS_NEW_SECTION = True
                 for page_config in section_pages:
                     # Hide admin_only pages for non-admins
                     if page_config.get("admin_only", False) and not is_admin:
                         continue
+                    if IS_NEW_SECTION:
+                        pages[section] = []
+                        IS_NEW_SECTION = False
                     page_func = create_page(page_config)
                     page = st.Page(
                         page_func,

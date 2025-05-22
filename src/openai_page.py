@@ -226,7 +226,8 @@ class PageFactory:
             object: An instance of the created page.
 
         Notes:
-            If the specified page type is unknown, a warning is displayed and the default "agent" page is created using fallback values.
+            If the specified page type is unknown, a warning is displayed and the default "agent"
+            page is created using fallback values.
         """
         page_type = page_config.get("type", "agent")
         creator = self._creators.get(page_type)
