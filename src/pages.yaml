@@ -58,7 +58,7 @@ sections:
       url_path: AndermattWorks
       header: 🏗️ Contoso Andermatt Works Representative
       subtitle: Ask me anything about our construction company, internal processes and our day-to-day jobs.
-      
+
     - type: agent
       agent: multi_doc_expert
       title: Multi-Doc Expert

@@ -17,7 +17,7 @@ agents:
   multi_doc_expert:
     persona: prompts/facilitator_persona.md
     documents:
-      - prompts/ai_discovery_cards.md 
+      - prompts/ai_discovery_cards.md
       - prompts/contoso_zermatt_national_bank.md
 
 sections:
@@ -30,7 +30,7 @@ sections:
       header: 🧑‍🏫 AI Discovery Cards Facilitator
       subtitle: I'm your AI Design Thinking Expert and can guide you through the AI Discovery Cards Workshop step by step.
       admin_only: true # Only visible to admins
-  
+
   Customers:
     - type: agent
       agent: customer_rep
@@ -39,7 +39,7 @@ sections:
       url_path: BankRepresentative
       header: 🏦 Contoso Zermatt National Bank Representative
       subtitle: Ask me anything about our bank, internal processes and our day-to-day jobs.
-      
+
     - type: agent
       agent: multi_doc_expert
       title: Multi-Doc Expert

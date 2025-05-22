@@ -36,14 +36,14 @@ from utils.openai_utils import handle_chat_prompt, load_prompt_files
 def get_system_messages(persona: str, documents=None):
     """
     Return the initial messages for the chat history.
-    
+
     Parameters:
     -----------
     persona : str
         Path to the persona prompt file.
     documents : str or list[str], optional
         Path(s) to document file(s) to use as context. Can be a single string or a list of strings.
-    
+
     Returns:
     --------
     list
@@ -62,7 +62,7 @@ def get_system_messages_multiagent(personas: list[str], documents: list[str] = N
     personas : list[str]
         List of paths to persona prompt files.
     documents : list[str], optional
-        List of paths to document files. If provided, each document is paired with the 
+        List of paths to document files. If provided, each document is paired with the
         corresponding persona. If a persona needs multiple documents, provide a list of lists.
 
     Returns:
@@ -76,7 +76,7 @@ def get_system_messages_multiagent(personas: list[str], documents: list[str] = N
         persona_docs = None
         if documents and i < len(documents):
             persona_docs = documents[i]
-        
+
         persona_messages = load_prompt_files(persona, persona_docs)
         messages.extend(persona_messages)
     return messages
@@ -152,7 +152,7 @@ def multiagent_page(
     return page
 
 
-def agent_page(persona: str, documents=None, header: str=None, subtitle: str=None):
+def agent_page(persona: str, documents=None, header: str = None, subtitle: str = None):
     """
     Create a Streamlit chat page for interacting with an agent persona.
 
@@ -245,17 +245,17 @@ def agent_page_from_key(agent_key: str, header: str, subtitle: str):
     agent = agent_registry.get(agent_key)
     if not agent:
         raise ValueError(f"Agent '{agent_key}' not found in registry.")
-    
+
     # Get the persona path
     persona = agent["persona"]
-    
+
     # Get document(s) - could be a single document or a list
     documents = None
     if "document" in agent:
         documents = agent["document"]
     elif "documents" in agent:
         documents = agent["documents"]
-    
+
     return agent_page(persona, documents, header, subtitle)
 
 
@@ -351,7 +351,9 @@ page_factory.register(
         if "agent" in cfg
         else agent_page(
             cfg["persona"],
-            cfg.get("documents", cfg.get("document")),  # Try documents first, then document
+            cfg.get(
+                "documents", cfg.get("document")
+            ),  # Try documents first, then document
             cfg["header"],
             cfg["subtitle"],
         )
