@@ -1,16 +1,15 @@
 """
-Streamlit page components for OpenAI-powered chat interfaces
+Streamlit page components for AI-powered chat interfaces
 
 This module provides components and utilities for building interactive chat interfaces that
-communicate with Azure OpenAI. It handles the UI/UX aspects of the chat experience and
-delegates the AI interactions to the openai_utils module.
+communicate with language models through the agent_core module. It handles the UI/UX aspects 
+of the chat experience while delegating the AI interactions to the agent_core module.
 
 Key Features:
-- Cached system message initialization
 - Dynamic chat page generation with customizable personas
 - Support for both single-agent and multi-agent pages
 - Persistent chat history across page reloads
-- Integration with OpenAI's chat completion API
+- Integration with the agent_core module for LLM interactions
 
 Page Types:
 - agent_page: Single agent chat interface with one persona and document context
@@ -19,7 +18,7 @@ Page Types:
 Dependencies:
 - streamlit: For UI components and session management
 - st_copy: For adding copy buttons to chat messages
-- utils.openai_utils: For OpenAI interactions and prompt management
+- agent_core: For agent instantiation and LLM interactions
 
 The module works by creating agent pages with specific personas and document contexts
 that can be integrated into a multi-page Streamlit application.
@@ -31,7 +30,7 @@ import streamlit as st
 from st_copy import copy_button
 
 from agent_registry import agent_registry
-from utils.openai_utils import handle_chat_prompt, load_prompt_files
+from agent_core import agent_core
 
 
 @st.cache_data
@@ -53,7 +52,7 @@ def get_system_messages(
     list[dict[str, str]]
         List of message objects with the system prompts loaded.
     """
-    return load_prompt_files(persona, documents)
+    return agent_core.get_system_messages(persona, documents)
 
 
 @st.cache_data
@@ -76,16 +75,7 @@ def get_system_messages_multiagent(
     list[dict[str, str]]
         Combined list of message objects for all personas with their documents.
     """
-    messages = []
-    for i, persona in enumerate(personas):
-        # Handle document pairing for this persona
-        persona_docs = None
-        if documents and i < len(documents):
-            persona_docs = documents[i]
-
-        persona_messages = load_prompt_files(persona, persona_docs)
-        messages.extend(persona_messages)
-    return messages
+    return agent_core.get_system_messages_multiagent(personas, documents)
 
 
 def multiagent_page(
@@ -123,8 +113,7 @@ def multiagent_page(
     ------
     The function relies on several external dependencies:
     - get_system_messages_multiagent(): For initializing the chat with system messages
-    - handle_chat_prompt(): From the openai_utils module.
-                            Expected to process user inputs and generate responses
+    - agent_core.handle_chat_prompt(): For processing user inputs and generating responses
     - copy_button(): Expected to add a copy button to assistant messages
 
     The chat history is stored in st.session_state.pages keyed by the current URL.
@@ -156,7 +145,28 @@ def multiagent_page(
 
         # Await a user message and handle the chat prompt when it comes in.
         if prompt := st.chat_input("Enter a message:"):
-            handle_chat_prompt(prompt, page)
+            with st.chat_message("user"):
+                st.markdown(prompt)
+                
+            # Call agent_core to handle the prompt and get the response
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                
+                # Process the prompt and get the response
+                result = agent_core.handle_chat_prompt(prompt, page)
+                
+                # Display the response
+                message_placeholder.markdown(result["response"])
+                copy_button(result["response"], key=result["response"])
+                
+                # Display token usage if available
+                if result.get("completion") and result["completion"].get("usage"):
+                    st.caption(
+                        f"""Token usage for this interaction:
+                    - Input tokens: {result["input_tokens"]}
+                    - Output tokens: {result["completion"]["usage"].completion_tokens}
+                    - Total tokens: {result["completion"]["usage"].total_tokens}"""
+                    )
 
     return page
 
@@ -195,8 +205,7 @@ def agent_page(
     ------
     The function relies on several external dependencies:
     - get_system_messages(): For initializing the chat with system messages
-    - handle_chat_prompt(): From the openai_utils module.
-                            Expected to process user inputs and generate responses
+    - agent_core.handle_chat_prompt(): For processing user inputs and generating responses
     - copy_button(): Expected to add a copy button to assistant messages
 
     The chat history is stored in st.session_state.pages keyed by the current URL.
@@ -228,7 +237,28 @@ def agent_page(
 
         # Await a user message and handle the chat prompt when it comes in.
         if prompt := st.chat_input("Enter a message:"):
-            handle_chat_prompt(prompt, page)
+            with st.chat_message("user"):
+                st.markdown(prompt)
+                
+            # Call agent_core to handle the prompt and get the response
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                
+                # Process the prompt and get the response
+                result = agent_core.handle_chat_prompt(prompt, page)
+                
+                # Display the response
+                message_placeholder.markdown(result["response"])
+                copy_button(result["response"], key=result["response"])
+                
+                # Display token usage if available
+                if result.get("completion") and result["completion"].get("usage"):
+                    st.caption(
+                        f"""Token usage for this interaction:
+                    - Input tokens: {result["input_tokens"]}
+                    - Output tokens: {result["completion"]["usage"].completion_tokens}
+                    - Total tokens: {result["completion"]["usage"].total_tokens}"""
+                    )
 
     return page
 
