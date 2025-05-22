@@ -67,7 +67,7 @@ def get_system_messages_multiagent(
     -----------
     personas : list[str]
         List of paths to persona prompt files.
-    documents : list[str], optional
+    documents : list[Union[str, list[str]]], optional
         List of paths to document files. If provided, each document is paired with the
         corresponding persona. If a persona needs multiple documents, provide a list of lists.
 
