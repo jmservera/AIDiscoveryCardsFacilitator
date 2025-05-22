@@ -26,24 +26,6 @@ from agent_core import agent_core, count_tokens, count_xml_tags
 logger = get_logger(__name__)
 
 
-def create_chat_completion(messages: List[Dict[str, str]]):
-    """Create and return a new chat completion request.
-
-    This is a compatibility function that delegates to agent_core.
-
-    Args:
-        messages: List of message objects with role and content
-
-    Returns:
-        A streaming response from the LLM
-    """
-    logger.warning(
-        "The openai_utils.create_chat_completion function is deprecated. "
-        "Please use agent_core.create_chat_completion instead."
-    )
-    return agent_core.create_chat_completion(messages)
-
-
 def handle_chat_prompt(prompt: str, page: Dict) -> None:
     """Process a user prompt, send to LLM and display the response.
 

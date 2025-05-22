@@ -252,8 +252,8 @@ class AgentCore:
             chat_history=chat_history,
             settings=AzureChatPromptExecutionSettings(
                 service_id=self.chat_service.service_id,
-                temperature=0.7,
-                max_tokens=4096,
+                # temperature=0.7,
+                # max_tokens=4096,
                 stream=True,
             ),
         )
