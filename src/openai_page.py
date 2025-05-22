@@ -25,35 +25,75 @@ The module works by creating agent pages with specific personas and document con
 that can be integrated into a multi-page Streamlit application.
 """
 
+from typing import Callable, Dict, List, Optional, Union
+
 import streamlit as st
 from st_copy import copy_button
 
+from agent_registry import agent_registry
 from utils.openai_utils import handle_chat_prompt, load_prompt_files
 
 
 @st.cache_data
-def get_system_messages(persona: str, document: str):
-    """Return the initial messages for the chat history."""
-    return load_prompt_files(persona, document)
+def get_system_messages(
+    persona: str, documents: Optional[Union[str, List[str]]] = None
+) -> List[Dict[str, str]]:
+    """
+    Return the initial messages for the chat history.
+
+    Parameters:
+    -----------
+    persona : str
+        Path to the persona prompt file.
+    documents : str or list[str], optional
+        Path(s) to document file(s) to use as context. Can be a single string or a list of strings.
+
+    Returns:
+    --------
+    list[dict[str, str]]
+        List of message objects with the system prompts loaded.
+    """
+    return load_prompt_files(persona, documents)
 
 
 @st.cache_data
-def get_system_messages_multiagent(personas: list[str], documents: list[str] = None):
-    """Return the initial messages for a multi-agent chat history.
+def get_system_messages_multiagent(
+    personas: List[str], documents: Optional[List[str]] = None
+) -> List[Dict[str, str]]:
+    """
+    Return the initial messages for a multi-agent chat history.
 
-    If documents are not provided, only persona prompts will be used.
+    Parameters:
+    -----------
+    personas : list[str]
+        List of paths to persona prompt files.
+    documents : list[Union[str, list[str]]], optional
+        List of paths to document files. If provided, each document is paired with the
+        corresponding persona. If a persona needs multiple documents, provide a list of lists.
+
+    Returns:
+    --------
+    list[dict[str, str]]
+        Combined list of message objects for all personas with their documents.
     """
     messages = []
     for i, persona in enumerate(personas):
-        doc = documents[i] if documents and i < len(documents) else ""
-        persona_messages = load_prompt_files(persona, doc)
+        # Handle document pairing for this persona
+        persona_docs = None
+        if documents and i < len(documents):
+            persona_docs = documents[i]
+
+        persona_messages = load_prompt_files(persona, persona_docs)
         messages.extend(persona_messages)
     return messages
 
 
 def multiagent_page(
-    personas: list[str], title: str, subtitle: str, documents: list[str] = None
-):
+    personas: List[str],
+    title: str,
+    subtitle: str,
+    documents: Optional[List[str]] = None,
+) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with multiple agent personas.
 
@@ -90,7 +130,7 @@ def multiagent_page(
     The chat history is stored in st.session_state.pages keyed by the current URL.
     """
 
-    def page():
+    def page() -> None:
         st.title(title)
         st.subheader(subtitle)
 
@@ -121,7 +161,12 @@ def multiagent_page(
     return page
 
 
-def agent_page(persona: str, document: str, header: str, subtitle: str):
+def agent_page(
+    persona: str,
+    documents: Optional[Union[str, List[str]]] = None,
+    header: Optional[str] = None,
+    subtitle: Optional[str] = None,
+) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with an agent persona.
 
@@ -133,12 +178,13 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     -----------
     persona : str
         The persona or role prompt file name that the assistant should adopt in the conversation.
-    document : str
-        The document or context file that the assistant should use as reference.
-    title : str
-        The title to display at the top of the page.
-    subtitle : str
-        The subtitle to display below the title.
+    documents : str or list[str], optional
+        The document or context file(s) that the assistant should use as reference.
+        Can be a single file path or a list of file paths.
+    header : str, optional
+        The header text to display at the top of the page.
+    subtitle : str, optional
+        The subtitle text to display below the header.
 
     Returns:
     --------
@@ -148,8 +194,7 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     Notes:
     ------
     The function relies on several external dependencies:
-    - get_system_messages(): From the openai_utils module.
-                             Expected to initialize the chat with system messages
+    - get_system_messages(): For initializing the chat with system messages
     - handle_chat_prompt(): From the openai_utils module.
                             Expected to process user inputs and generate responses
     - copy_button(): Expected to add a copy button to assistant messages
@@ -157,7 +202,7 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     The chat history is stored in st.session_state.pages keyed by the current URL.
     """
 
-    def page():
+    def page() -> None:
         st.title(header)
         st.subheader(subtitle)
 
@@ -170,7 +215,7 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
         page = st.session_state.pages[st.context.url]
         # Initialize chat history
         if "messages" not in page:
-            page["messages"] = get_system_messages(persona, document)
+            page["messages"] = get_system_messages(persona, documents)
 
         # Display chat messages from history on app rerun
         for message in page["messages"]:
@@ -188,46 +233,103 @@ def agent_page(persona: str, document: str, header: str, subtitle: str):
     return page
 
 
+def agent_page_from_key(
+    agent_key: str, header: str, subtitle: str
+) -> Callable[[], None]:
+    """
+    Create an agent page using the agent key to look up the agent's configuration.
+
+    Parameters:
+    -----------
+    agent_key : str
+        The key of the agent to look up in the agent registry.
+    header : str
+        The header title to display at the top of the page.
+    subtitle : str
+        The subtitle to display below the header.
+
+    Returns:
+    --------
+    function
+        A page function that can be called to render the chat interface.
+
+    Raises:
+    -------
+    ValueError
+        If the agent key is not found in the registry.
+    """
+    agent = agent_registry.get(agent_key)
+    if not agent:
+        raise ValueError(f"Agent '{agent_key}' not found in registry.")
+
+    # Get the persona path
+    persona = agent["persona"]
+
+    # Get document(s) - could be a single document or a list
+    documents = None
+    if "document" in agent:
+        documents = agent["document"]
+    elif "documents" in agent:
+        documents = agent["documents"]
+
+    return agent_page(persona, documents, header, subtitle)
+
+
 class PageFactory:
     """
     Factory class for creating Streamlit chat pages based on configuration.
+
+    This class allows registering different page types and their corresponding
+    creation logic. It supports extensibility by enabling new page types to be
+    added dynamically.
     """
 
     def __init__(self):
+        """
+        Initialize the PageFactory with an empty registry of page creators.
+        """
         self._creators = {}
 
-    def register(self, page_type, creator):
+    def register(self, page_type: str, creator: Callable[[Dict], Callable]) -> None:
         """
-        Registers a new page creator for a specific page type.
+        Register a new page creator for a specific page type.
 
-        Args:
-            page_type: The type or identifier of the page to associate with the creator.
-            creator: A callable or class responsible for creating instances of the specified page type.
+        Parameters:
+        -----------
+        page_type : str
+            The type or identifier of the page to associate with the creator.
+        creator : callable
+            A callable or class responsible for creating instances of the specified page type.
 
-        Raises:
-            None explicitly, but may overwrite an existing creator for the given page_type.
+        Notes:
+        ------
+        If a creator is already registered for the given page type, it will be overwritten.
         """
         self._creators[page_type] = creator
 
-    def create(self, page_config):
+    def create(self, page_config: Dict) -> Callable[[], None]:
         """
-        Creates a page instance based on the provided configuration.
+        Create a page instance based on the provided configuration.
 
-        Args:
-            page_config (dict): A dictionary containing the configuration for the page.
-                Expected keys include:
-                    - "type" (str, optional): The type of page to create. Defaults to "agent".
-                    - "persona" (str, optional): Path to the persona file. Used if type is "agent".
-                    - "document" (str, optional): Path to the document file. Used if type is "agent".
-                    - "header" (str): The header text for the page.
-                    - "subtitle" (str): The subtitle text for the page.
+        Parameters:
+        -----------
+        page_config : dict
+            A dictionary containing the configuration for the page.
+            Expected keys include:
+                - "type" (str, optional): The type of page to create. Defaults to "agent".
+                - "agent" (str, optional): The key of the agent to use for the page.
+                - "header" (str): The header text for the page.
+                - "subtitle" (str): The subtitle text for the page.
 
         Returns:
-            object: An instance of the created page.
+        --------
+        function
+            An instance of the created page.
 
         Notes:
-            If the specified page type is unknown, a warning is displayed and the default "agent"
-            page is created using fallback values.
+        ------
+        If the specified page type is unknown, a warning is displayed and the default "agent"
+        page is created using fallback values.
         """
         page_type = page_config.get("type", "agent")
         creator = self._creators.get(page_type)
@@ -256,11 +358,21 @@ page_factory = PageFactory()
 # Adapter functions to match the expected signature
 page_factory.register(
     "agent",
-    lambda cfg: agent_page(
-        cfg["persona"],
-        cfg["document"],
-        cfg["header"],
-        cfg["subtitle"],
+    lambda cfg: (
+        agent_page_from_key(
+            cfg["agent"],
+            cfg["header"],
+            cfg["subtitle"],
+        )
+        if "agent" in cfg
+        else agent_page(
+            cfg["persona"],
+            cfg.get(
+                "documents", cfg.get("document")
+            ),  # Try documents first, then document
+            cfg["header"],
+            cfg["subtitle"],
+        )
     ),
 )
 page_factory.register(
@@ -274,9 +386,19 @@ page_factory.register(
 )
 
 
-def create_page(page_config):
+def create_page(page_config: Dict) -> Callable[[], None]:
     """
     Factory function to create the appropriate page based on configuration.
     Delegates to PageFactory for extensibility.
+
+    Parameters:
+    -----------
+    page_config : dict
+        A dictionary containing the configuration for the page.
+
+    Returns:
+    --------
+    function
+        An instance of the created page.
     """
     return page_factory.create(page_config)

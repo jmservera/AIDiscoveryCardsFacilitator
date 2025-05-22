@@ -1,8 +1,44 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Discovery Cards Agent Pages Schema",
+    "title": "Discovery Cards Agent Unified Schema",
     "type": "object",
     "properties": {
+        "agents": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "persona": {
+                        "type": "string"
+                    },
+                    "document": {
+                        "type": "string"
+                    },
+                    "documents": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "persona"
+                ],
+                "oneOf": [
+                    {
+                        "required": [
+                            "document"
+                        ]
+                    },
+                    {
+                        "required": [
+                            "documents"
+                        ]
+                    }
+                ],
+                "additionalProperties": false
+            }
+        },
         "sections": {
             "type": "object",
             "additionalProperties": {
@@ -13,8 +49,7 @@
                             "type": "object",
                             "required": [
                                 "type",
-                                "persona",
-                                "document",
+                                "agent",
                                 "title",
                                 "icon",
                                 "url_path",
@@ -25,10 +60,7 @@
                                 "type": {
                                     "const": "agent"
                                 },
-                                "persona": {
-                                    "type": "string"
-                                },
-                                "document": {
+                                "agent": {
                                     "type": "string"
                                 },
                                 "title": {
@@ -107,6 +139,7 @@
         }
     },
     "required": [
+        "agents",
         "sections"
     ],
     "additionalProperties": false
