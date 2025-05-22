@@ -23,19 +23,22 @@ Dependencies:
 - tiktoken: For token counting
 """
 
+import logging
 import os
 import re
-import logging
-from typing import Dict, List, Optional, Union, Any, Generator
+from typing import Any, Dict, Generator, List, Optional, Union
 
 import openai
-import tiktoken
-from dotenv import load_dotenv
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
 import semantic_kernel as sk
-from semantic_kernel.connectors.ai.open_ai.services.azure_chat_completion import AzureChatCompletion
-from semantic_kernel.connectors.ai.open_ai.prompt_execution_settings.azure_chat_prompt_execution_settings import AzureChatPromptExecutionSettings
+import tiktoken
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from dotenv import load_dotenv
+from semantic_kernel.connectors.ai.open_ai.prompt_execution_settings.azure_chat_prompt_execution_settings import (
+    AzureChatPromptExecutionSettings,
+)
+from semantic_kernel.connectors.ai.open_ai.services.azure_chat_completion import (
+    AzureChatCompletion,
+)
 from semantic_kernel.contents.chat_history import ChatHistory
 
 # Configure logging
@@ -135,39 +138,39 @@ def load_prompt_files(
 
 class AgentCore:
     """Core agent class that manages agent instances and LLM interactions.
-    
+
     This class provides methods for creating and managing agents, loading prompt files,
     and handling chat completions using Semantic Kernel.
-    
+
     Attributes:
         kernel: The Semantic Kernel instance for LLM orchestration
         chat_service: The chat completion service
     """
-    
+
     def __init__(self) -> None:
         """Initialize the AgentCore with a Semantic Kernel instance."""
         self.kernel = self._create_kernel()
         self.chat_service = self._create_chat_service()
-        
+
     def _create_kernel(self) -> sk.Kernel:
         """Create and configure a Semantic Kernel instance.
-        
+
         Returns:
             A configured Semantic Kernel instance
         """
         kernel = sk.Kernel()
         return kernel
-        
+
     def _create_chat_service(self) -> AzureChatCompletion:
         """Create and configure the chat completion service.
-        
+
         Returns:
             A configured chat completion service
         """
         token_provider = get_bearer_token_provider(
             DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
         )
-        
+
         # Create the Azure Chat Completion service
         chat_service = AzureChatCompletion(
             deployment_name=AZURE_OPENAI_DEPLOYMENT_NAME,
@@ -176,12 +179,12 @@ class AgentCore:
             api_key=None,
             ad_token=token_provider(),
         )
-        
+
         # Add the service to the kernel
         self.kernel.add_service(chat_service)
-        
+
         return chat_service
-    
+
     def get_system_messages(
         self, persona: str, documents: Optional[Union[str, List[str]]] = None
     ) -> List[Dict[str, str]]:
@@ -195,7 +198,7 @@ class AgentCore:
             List of message objects with the system prompts loaded
         """
         return load_prompt_files(persona, documents)
-    
+
     def get_system_messages_multiagent(
         self, personas: List[str], documents: Optional[List[str]] = None
     ) -> List[Dict[str, str]]:
@@ -219,32 +222,32 @@ class AgentCore:
             persona_messages = load_prompt_files(persona, persona_docs)
             messages.extend(persona_messages)
         return messages
-    
+
     def create_chat_completion(
         self, messages: List[Dict[str, str]]
     ) -> Generator[Any, None, None]:
         """Create a chat completion using Semantic Kernel.
-        
+
         Args:
             messages: List of message objects with role and content
-            
+
         Yields:
             Response chunks directly from Semantic Kernel's streaming API
         """
         # Convert the message format to Semantic Kernel's format
         chat_history = ChatHistory()
-        
+
         for message in messages:
             role = message["role"]
             content = message["content"]
-            
+
             if role == "system":
                 chat_history.add_system_message(content)
             elif role == "user":
                 chat_history.add_user_message(content)
             elif role == "assistant":
                 chat_history.add_assistant_message(content)
-        
+
         # Create the chat completion request with streaming enabled
         completion_request = self.chat_service.get_streaming_chat_message_content(
             chat_history=chat_history,
@@ -255,10 +258,10 @@ class AgentCore:
                 stream=True,
             ),
         )
-        
+
         # Use asyncio to run the async generator and convert to sync generator
         import asyncio
-        
+
         async def run_async_generator():
             try:
                 async for chunk in completion_request:
@@ -266,24 +269,33 @@ class AgentCore:
             except Exception as e:
                 logger.exception("Error in chat completion: %s", e)
                 # Create a simple error message chunk
-                error_chunk = type('ErrorChunk', (), {
-                    'content': "\nAn error occurred during processing. Please try again.",
-                    'metadata': None
-                })
+                error_chunk = type(
+                    "ErrorChunk",
+                    (),
+                    {
+                        "content": "\nAn error occurred during processing. Please try again.",
+                        "metadata": None,
+                    },
+                )
                 yield error_chunk
-        
+
         # Convert async generator to sync generator
         def sync_generator():
-            agen = run_async_generator()
-            
-            while True:
-                try:
-                    yield asyncio.run(agen.__anext__())
-                except StopAsyncIteration:
-                    break
-        
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                agen = run_async_generator()
+                while True:
+                    try:
+                        yield loop.run_until_complete(agen.__anext__())
+                    except StopAsyncIteration:
+                        break
+            finally:
+                loop.close()
+
         return sync_generator()
-    
+
     def handle_chat_prompt(self, prompt: str, page: Dict) -> Dict[str, Any]:
         """Process a user prompt, send to LLM and return the response.
 
@@ -305,34 +317,36 @@ class AgentCore:
 
         # Calculate tokens in the input
         input_tokens = count_tokens(page["messages"])
-        
+
         # Send the prompt to the LLM
         full_response = ""
         usage_info = None
-        
+
         try:
             for chunk in self.create_chat_completion(page["messages"]):
-                if hasattr(chunk, 'content') and chunk.content is not None:
+                if hasattr(chunk, "content") and chunk.content is not None:
                     full_response += chunk.content
-                
+
                 # Check for usage information in the chunk metadata
-                if hasattr(chunk, 'metadata') and chunk.metadata:
-                    if hasattr(chunk.metadata, 'usage'):
+                if hasattr(chunk, "metadata") and chunk.metadata:
+                    if hasattr(chunk.metadata, "usage"):
                         usage_info = chunk.metadata.usage
         except Exception as e:
             logger.exception("Error processing chat completion: %s", e)
-            full_response = "An error occurred while processing your request. Please try again."
-        
+            full_response = (
+                "An error occurred while processing your request. Please try again."
+            )
+
         # Add the response to the messages
         page["messages"].append({"role": "assistant", "content": full_response})
-        
+
         # Return response information
         result = {
             "response": full_response,
             "input_tokens": input_tokens,
-            "usage_info": usage_info
+            "usage_info": usage_info,
         }
-        
+
         return result
 
 
