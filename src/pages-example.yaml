@@ -60,7 +60,7 @@ sections:
       header: 👥 Collaborative Team Workspace
       subtitle: Work with multiple agents simultaneously in a shared workspace.
 
-  # Example of how to add additional sections
+  # Example of how to add additional sections for admins
   Resources:
     - type: agent
       agent: facilitator
@@ -69,3 +69,4 @@ sections:
       url_path: Documentation
       header: 📚 Documentation and Resources
       subtitle: Access helpful documentation and resources about AI discovery.
+      admin_only: true # Only visible to admins
