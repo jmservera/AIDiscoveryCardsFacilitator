@@ -54,7 +54,7 @@ authenticator = stauth.Authenticate(
 
 def clear(values):
     """Clear the session state and redirect to the login page."""
-    for key in st.session_state.keys():
+    for key in list(st.session_state.keys()):
         del st.session_state[key]
 
 
