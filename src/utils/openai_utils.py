@@ -6,7 +6,23 @@ responses from Azure OpenAI services. It handles token management, message forma
 and streaming chat completions using Azure OpenAI's API.
 
 Key Features:
-- Authentication with Azure OpenAI using DefaultAzureCredential
+        # Display the mermaid diagram
+        try:
+            # Set a more appropriate height based on number of lines in the diagram
+            # with a minimum height to ensure diagrams are properly displayed
+            line_count = diagram_code.count('\n') + 1
+            node_count = diagram_code.count('[') + diagram_code.count('{') + diagram_code.count('(')
+
+            # Adjust height based on complexity: more lines = more height
+            height = max(line_count * 30, node_count * 70, 400)  # Minimum 400px height
+
+            # Use container width (which adapts to the page width)
+            # Render the mermaid diagram with adjusted dimensions
+            st_mermaid(diagram_code, height=height, width="container")
+        except Exception as e:
+            logger.exception("Error rendering mermaid diagram: %s", e)
+            st.error(f"Failed to render diagram: {e}")
+            st.code(diagram_code, language="mermaid")uthentication with Azure OpenAI using DefaultAzureCredential
 - Token counting and management for input and output messages
 - Streaming chat completions with proper error handling
 - Loading and formatting system prompts from files
@@ -299,7 +315,67 @@ def render_response_with_mermaid(response_text: str) -> None:
 
         # Display the mermaid diagram
         try:
-            st_mermaid(diagram_code, height=None)
+            # Determine diagram type to better calculate height
+            diagram_type = "unknown"
+            if diagram_code.strip().startswith(
+                "graph"
+            ) or diagram_code.strip().startswith("flowchart"):
+                diagram_type = "flowchart"
+            elif diagram_code.strip().startswith("sequenceDiagram"):
+                diagram_type = "sequence"
+            elif diagram_code.strip().startswith("classDiagram"):
+                diagram_type = "class"
+            elif diagram_code.strip().startswith("gantt"):
+                diagram_type = "gantt"
+            elif diagram_code.strip().startswith("pie"):
+                diagram_type = "pie"
+
+            # Calculate complexity metrics
+            line_count = diagram_code.count("\n") + 1
+            node_count = (
+                diagram_code.count("[")
+                + diagram_code.count("{")
+                + diagram_code.count("(")
+            )
+            connection_count = (
+                diagram_code.count("-->")
+                + diagram_code.count("==>")
+                + diagram_code.count("-.->")
+            )
+
+            # Get user's diagram scale preference
+            scale_factor = get_diagram_scale_factor()
+
+            # Adjust height based on diagram type and complexity
+            if diagram_type == "flowchart":
+                height = max(node_count * 80, line_count * 25, 400)
+            elif diagram_type == "sequence":
+                # Sequence diagrams need more height per interaction
+                height = max(line_count * 30, connection_count * 60, 500)
+            elif diagram_type == "class":
+                # Class diagrams tend to be taller
+                height = max(node_count * 100, line_count * 25, 600)
+            elif diagram_type == "gantt":
+                # Gantt charts need height based on tasks
+                task_count = diagram_code.count(":")
+                height = max(task_count * 60, line_count * 20, 400)
+            elif diagram_type == "pie":
+                # Pie charts are generally more compact
+                height = max(line_count * 20, 400)
+            else:
+                # Default calculation for unknown types
+                height = max(line_count * 30, node_count * 70, 500)
+
+            # Apply user scaling preference
+            height = int(height * scale_factor)
+
+            # Apply user-defined scaling factor
+            scale_factor = get_diagram_scale_factor()
+            height = int(height * scale_factor)
+
+            # Use container width to adapt to page size
+            result = st_mermaid(diagram_code, height=height, width="container")
+            logger.debug(result)
         except Exception as e:
             logger.exception("Error rendering mermaid diagram: %s", e)
             st.error(f"Failed to render diagram: {e}")
@@ -314,3 +390,25 @@ def render_response_with_mermaid(response_text: str) -> None:
     # Display any remaining text after the last diagram
     if remaining_text:
         st.markdown(remaining_text)
+
+
+def get_diagram_scale_factor() -> float:
+    """Get the user's preferred diagram scaling factor from session state.
+
+    Returns:
+        A float representing the scaling factor for diagram sizes (default 1.0)
+    """
+    # Initialize scale factor if not already in session state
+    if "diagram_scale_factor" not in st.session_state:
+        st.session_state.diagram_scale_factor = 1.0
+
+    return st.session_state.diagram_scale_factor
+
+
+def set_diagram_scale_factor(scale_factor: float) -> None:
+    """Set the user's preferred diagram scaling factor in session state.
+
+    Args:
+        scale_factor: A float representing the scaling factor for diagrams
+    """
+    st.session_state.diagram_scale_factor = scale_factor
