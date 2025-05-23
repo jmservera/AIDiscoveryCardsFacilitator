@@ -69,50 +69,57 @@ def login_page() -> None:
         st.warning("Please enter your username and password")
 
 
-try:
-    if st.session_state.get("authentication_status"):
-        # Load pages from pages.yaml file
-        try:
-            with open("./pages.yaml", encoding="utf-8") as file:
-                pages_config = yaml.load(file, Loader=SafeLoader)
+def main() -> None:
+    """Main function to run the Streamlit application."""
+    try:
+        if st.session_state.get("authentication_status"):
+            # Load pages from pages.yaml file
+            try:
+                with open("./pages.yaml", encoding="utf-8") as file:
+                    pages_config = yaml.load(file, Loader=SafeLoader)
 
-            # Determine if the user is an admin
-            user_roles = st.session_state.get("roles")
-            is_admin = "admin" in user_roles
+                # Determine if the user is an admin
+                user_roles = st.session_state.get("roles")
+                is_admin = "admin" in user_roles
 
-            # Convert YAML configuration to streamlit pages structure
-            pages = {}
-            for section, section_pages in pages_config["sections"].items():
-                IS_NEW_SECTION = True
-                for page_config in section_pages:
-                    # Hide admin_only pages for non-admins
-                    if page_config.get("admin_only", False) and not is_admin:
-                        continue
-                    if IS_NEW_SECTION:
-                        pages[section] = []
-                        IS_NEW_SECTION = False
-                    page_func = create_page(page_config)
-                    page = st.Page(
-                        page_func,
-                        title=page_config["title"],
-                        icon=page_config["icon"],
-                        url_path=page_config["url_path"],
-                    )
-                    pages[section].append(page)
+                # Convert YAML configuration to streamlit pages structure
+                pages = {}
+                for section, section_pages in pages_config["sections"].items():
+                    is_new_section = True
+                    for page_config in section_pages:
+                        # Hide admin_only pages for non-admins
+                        if page_config.get("admin_only", False) and not is_admin:
+                            continue
+                        if is_new_section:
+                            pages[section] = []
+                            is_new_section = False
+                        page_func = create_page(page_config)
+                        page = st.Page(
+                            page_func,
+                            title=page_config["title"],
+                            icon=page_config["icon"],
+                            url_path=page_config["url_path"],
+                        )
+                        pages[section].append(page)
 
-            pg = st.navigation(pages, position="sidebar")
-            authenticator.logout(location="sidebar", callback=clear)
+                pg = st.navigation(pages, position="sidebar")
+                authenticator.logout(location="sidebar", callback=clear)
+                pg.run()
+            except (yaml.YAMLError, FileNotFoundError) as page_error:
+                st.error(f"Error loading pages configuration: {page_error}")
+
+        else:
+            pg = st.navigation([login_page], position="hidden")
             pg.run()
-        except (yaml.YAMLError, FileNotFoundError) as page_error:
-            st.error(f"Error loading pages configuration: {page_error}")
+        with open("./config.yaml", "w", encoding="utf-8") as file:
+            yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
+    except (
+        yaml.YAMLError,
+        FileNotFoundError,
+    ) as e:
+        st.error(e)
 
-    else:
-        pg = st.navigation([login_page], position="hidden")
-        pg.run()
-    with open("./config.yaml", "w", encoding="utf-8") as file:
-        yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
-except (
-    yaml.YAMLError,
-    FileNotFoundError,
-) as e:
-    st.error(e)
+
+if __name__ == "__main__":
+    # Run the main function
+    main()
