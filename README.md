@@ -42,3 +42,26 @@ agents:
 
 This allows creating more capable agents with access to multiple knowledge sources.
 
+## Mermaid Diagram Support
+
+The application supports rendering Mermaid diagrams directly in chat responses. When the AI generates responses containing Mermaid diagram code blocks, they will be automatically rendered as visual diagrams.
+
+Example of a Mermaid diagram in a response:
+
+````markdown
+Here's a simple workflow:
+
+```mermaid
+graph TD
+    A[Start] --> B{Decision Point}
+    B -->|Option 1| C[Result 1]
+    B -->|Option 2| D[Result 2]
+    C --> E[End]
+    D --> E
+```
+
+The diagram above shows a simple decision flow.
+````
+
+The application will detect the Mermaid code blocks and render them as interactive diagrams while preserving the rest of the response's markdown formatting.
+
