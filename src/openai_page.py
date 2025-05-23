@@ -29,6 +29,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 import streamlit as st
 from st_copy import copy_button
+from streamlit_markdown import st_markdown
 
 from agent_registry import agent_registry
 from utils.openai_utils import handle_chat_prompt, load_prompt_files
@@ -145,12 +146,20 @@ def multiagent_page(
         if "messages" not in page:
             page["messages"] = get_system_messages_multiagent(personas, documents)
 
+        custom_color = {
+            "bg": "black",
+            "border": "black",  # "border-gray-300",
+            "text": "black",  # "text-green-900",
+            "hover_bg": "hover:bg-gray-200",
+            "hover_text": "hover:text-gray-900",
+        }
+
         # Display chat messages from history on app rerun
         for message in page["messages"]:
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
-                    st.markdown(msg)
+                    st_markdown(msg, theme_color="custom", custom_color=custom_color)
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
 
@@ -222,7 +231,7 @@ def agent_page(
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
-                    st.markdown(msg)
+                    st_markdown(msg)
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
 

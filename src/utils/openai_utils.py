@@ -25,7 +25,7 @@ Dependencies:
 
 import os
 import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, Generator, List, Optional, Union
 
 import openai
 import streamlit as st
@@ -34,6 +34,7 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 from st_copy import copy_button
 from streamlit.logger import get_logger
+from streamlit_markdown import st_streaming_markdown
 
 # Configure logging using Streamlit's logger
 logger = get_logger(__name__)
@@ -150,23 +151,27 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
 
     # Send the user's prompt to Azure OpenAI and display the response
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
+        # message_placeholder = st.empty()
         full_response = ""
         completion = None
-        for response in create_chat_completion(page["messages"]):
-            if response.choices:
-                try:
-                    if response.choices[0].delta is not None:
-                        full_response += response.choices[0].delta.content or ""
-                        message_placeholder.markdown(full_response + "▌")
-                    else:
-                        logger.debug(response.choices[0].model_dump_json())
-                except (AttributeError, IndexError) as e:
-                    logger.exception("Error processing response: %s", e)
-                    full_response += "An error happened, retry your request.\n"
-            completion = response
-        message_placeholder.markdown(full_response)
 
+        def stream_message() -> Generator[str, str, str]:
+            nonlocal full_response, completion
+            for response in create_chat_completion(page["messages"]):
+                if response.choices:
+                    try:
+                        if response.choices[0].delta is not None:
+                            value = response.choices[0].delta.content or ""
+                            full_response += value
+                            yield value
+                        else:
+                            logger.debug(response.choices[0].model_dump_json())
+                    except (AttributeError, IndexError) as e:
+                        logger.exception("Error processing response: %s", e)
+                        yield "An error happened, retry your request.\n"
+                completion = response
+
+        st_streaming_markdown(stream_message(), key="assistant")
     # Add the response to the messages
     page["messages"].append({"role": "assistant", "content": full_response})
 
