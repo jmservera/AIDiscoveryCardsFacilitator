@@ -26,7 +26,6 @@ Note: The application expects the configuration files in the same directory with
 format.
 """
 
-import pathlib
 from typing import Any
 
 import streamlit as st
@@ -36,21 +35,37 @@ from yaml.loader import SafeLoader
 
 from openai_page import create_page
 
-with open("./config.yaml", encoding="utf-8") as file:
-    config = yaml.load(file, Loader=SafeLoader)
 
-CURRENT_DIR = pathlib.Path(__file__).parent.resolve()
+def initialize_authentication():
+    """
+    Initializes user authentication for the Streamlit app using configuration from a YAML file.
 
-st.set_page_config(layout="wide")
-# Pre-hashing all plain text passwords once
-# stauth.Hasher.hash_passwords(config['credentials'])
+    This function loads authentication and cookie settings from a local 'config.yaml' file,
+    sets the Streamlit page layout, and returns an instance of the stauth.Authenticate class
+    configured with the loaded credentials and cookie parameters.
 
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-)
+    Returns:
+        stauth.Authenticate: An authentication object configured with credentials and cookie settings.
+    """
+    with open("./config.yaml", encoding="utf-8") as file:
+        configuration = yaml.load(file, Loader=SafeLoader)
+
+    st.set_page_config(layout="wide")
+    # Pre-hashing all plain text passwords once
+    # stauth.Hasher.hash_passwords(config['credentials'])
+
+    return (
+        stauth.Authenticate(
+            configuration["credentials"],
+            configuration["cookie"]["name"],
+            configuration["cookie"]["key"],
+            configuration["cookie"]["expiry_days"],
+        ),
+        configuration,
+    )
+
+
+authenticator, config = initialize_authentication()
 
 
 def clear(_: Any) -> None:

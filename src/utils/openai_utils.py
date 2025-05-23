@@ -156,7 +156,7 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
         for response in create_chat_completion(page["messages"]):
             if response.choices:
                 try:
-                    if response.choices[0].delta != None:
+                    if response.choices[0].delta is not None:
                         full_response += response.choices[0].delta.content or ""
                         message_placeholder.markdown(full_response + "▌")
                     else:
