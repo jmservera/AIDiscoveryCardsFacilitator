@@ -18,7 +18,11 @@
                 "--server.address",
                 "0.0.0.0",
                 "--logger.level",
-                "debug"
+                "info",
+                "--client.showErrorDetails",
+                "full",
+                "--client.toolbarMode",
+                "developer"
             ]
         }
     ]
