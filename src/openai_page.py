@@ -29,9 +29,12 @@ from typing import Callable, Dict, List, Optional, Union
 
 import streamlit as st
 from st_copy import copy_button
+from streamlit.logger import get_logger
 
 from agent_registry import agent_registry
 from utils.openai_utils import handle_chat_prompt, load_prompt_files, render_response
+
+logger = get_logger(__name__)
 
 
 @st.cache_data
@@ -83,6 +86,11 @@ def get_system_messages_multiagent(
         if documents and i < len(documents):
             persona_docs = documents[i]
 
+        logger.info(
+            "Loading messages for persona {persona} with documents {documents}",
+            persona=persona,
+            documents=persona_docs,
+        )
         persona_messages = load_prompt_files(persona, persona_docs)
         messages.extend(persona_messages)
     return messages
@@ -220,18 +228,29 @@ def agent_page(
         if "messages" not in page:
             page["messages"] = get_system_messages(persona, documents)
 
+        msg_count = 0
         # Display chat messages from history on app rerun
         for message in page["messages"]:
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
                     render_response(msg)
+                    msg_count += 1
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
 
         # Await a user message and handle the chat prompt when it comes in.
+
         if prompt := st.chat_input("Enter a message:"):
+            logger.debug("Received user prompt: %s", prompt)
             handle_chat_prompt(prompt, page)
+
+            logger.debug("Adding reset button.")
+            reset_button_key = "reset_button"
+            reset_button = st.button("Reset Chat", key=reset_button_key)
+            if reset_button:
+                page["messages"] = get_system_messages(persona, documents)
+                st.rerun()
 
     return page
 

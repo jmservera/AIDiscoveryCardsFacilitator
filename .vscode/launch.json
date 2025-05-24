@@ -18,7 +18,7 @@
                 "--server.address",
                 "0.0.0.0",
                 "--logger.level",
-                "info",
+                "debug",
                 "--client.showErrorDetails",
                 "full",
                 "--client.toolbarMode",

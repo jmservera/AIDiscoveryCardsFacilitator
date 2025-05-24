@@ -35,6 +35,8 @@ from yaml.loader import SafeLoader
 
 from openai_page import create_page
 
+AUTH_CONFIG_FILE = "./config/auth-config.yaml"
+
 
 def initialize_authentication():
     """
@@ -47,7 +49,7 @@ def initialize_authentication():
     Returns:
         stauth.Authenticate: An authentication object configured with credentials and cookie settings.
     """
-    with open("./config.yaml", encoding="utf-8") as file:
+    with open(AUTH_CONFIG_FILE, encoding="utf-8") as file:
         configuration = yaml.load(file, Loader=SafeLoader)
 
     st.set_page_config(layout="wide")
@@ -90,7 +92,7 @@ def main() -> None:
         if st.session_state.get("authentication_status"):
             # Load pages from pages.yaml file
             try:
-                with open("./pages.yaml", encoding="utf-8") as file:
+                with open("./config/pages.yaml", encoding="utf-8") as file:
                     pages_config = yaml.load(file, Loader=SafeLoader)
 
                 # Determine if the user is an admin
@@ -126,8 +128,8 @@ def main() -> None:
         else:
             pg = st.navigation([login_page], position="hidden")
             pg.run()
-        with open("./config.yaml", "w", encoding="utf-8") as file:
-            yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
+        # with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as file:
+        #     yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
     except (
         yaml.YAMLError,
         FileNotFoundError,

@@ -18,8 +18,11 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import yaml
+from streamlit.logger import get_logger
 
-PAGES_FILE = Path(__file__).parent / "pages.yaml"
+PAGES_FILE = Path(__file__).parent / "config/pages.yaml"
+
+logger = get_logger(__name__)
 
 
 class AgentRegistry:
@@ -47,6 +50,7 @@ class AgentRegistry:
         pages_file : Path, optional
             The path to the YAML file containing agent definitions. Defaults to PAGES_FILE.
         """
+        logger.info("Loading agent definitions from %s", pages_file)
         with open(pages_file, encoding="utf-8") as f:
             self._agents = yaml.safe_load(f)["agents"]
 

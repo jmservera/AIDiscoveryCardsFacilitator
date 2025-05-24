@@ -4,15 +4,15 @@ This is a simple facilitator and a representative of a company for an AI Discove
 
 ## Installation
 
-Rename the file [src/config-example.yaml](src/config-example.yaml) to `src/config.yaml` and change the password. The username is `admin` and the password is `admin`. You can change it to whatever you want.
+Rename the file [src/config/auth-config-example.yaml](src/config/auth-config-example.yaml) to `src/config/auth-config.yaml` and change the password. The username is `admin` and the password is `admin`. You can change it to whatever you want.
 
-Rename the file [src/pages-example.yaml](src/pages-example.yaml) to `src/pages.yaml` to use the example configuration, or customize it to your needs.
+Rename the file [src/config/pages-example.yaml](src/config/pages-example.yaml) to `src/config/pages.yaml` to use the example configuration, or customize it to your needs.
 
 ## Configuration
 
 ### Authentication
 
-The `config.yaml` file contains the user authentication settings. See the example file for details.
+The `auth-config.yaml` file contains the user authentication settings. See the example file for details.
 
 ### Pages and Agents
 

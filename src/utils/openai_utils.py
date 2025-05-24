@@ -91,6 +91,7 @@ def create_chat_completion(messages: List[Dict[str, str]]) -> openai.Stream:
 
     client = get_client()
 
+    logger.debug("Creating chat completion with %d messages", len(messages))
     # Create and return a new chat completion request
     return client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT_NAME,
@@ -159,12 +160,13 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
 
     # Echo the user's prompt to the chat window
     page["messages"].append({"role": "user", "content": prompt})
+    logger.debug("Writing user prompt to chat")
     with st.chat_message("user"):
         st.markdown(prompt)
 
     # Calculate tokens in the input
     input_tokens = count_tokens(page["messages"])
-
+    logger.debug("Input tokens: %d", input_tokens)
     # Send the user's prompt to Azure OpenAI and display the response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
@@ -181,8 +183,11 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
                 except (AttributeError, IndexError) as e:
                     logger.exception("Error processing response: %s", e)
                     full_response += "An error happened, retry your request.\n"
+            else:
+                logger.warning("Received empty response from OpenAI API")
             completion = response
 
+        logger.debug("Full response before rendering: %s", full_response)
         # Clear the placeholder after streaming
         message_placeholder.empty()
 
@@ -291,6 +296,7 @@ def render_response(response_text: str) -> None:
     Returns:
         None - renders the content directly to the Streamlit UI
     """
+    logger.debug("Rendering response text with potential Mermaid diagrams")
     # Extract mermaid diagrams from the response
     mermaid_diagrams = extract_mermaid_diagrams(response_text)
 
@@ -299,6 +305,7 @@ def render_response(response_text: str) -> None:
         st.markdown(response_text)
         return
 
+    logger.info("Found %d mermaid diagrams in the response", len(mermaid_diagrams))
     # Process text with mermaid diagrams
     remaining_text = response_text
 
