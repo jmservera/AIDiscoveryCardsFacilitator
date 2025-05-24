@@ -59,6 +59,7 @@ load_dotenv()
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
 
 @st.cache_resource
@@ -74,12 +75,14 @@ def get_client() -> openai.AzureOpenAI:
 
     return openai.AzureOpenAI(
         azure_ad_token_provider=token_provider,
-        api_version="2024-06-01",
+        api_version=AZURE_OPENAI_API_VERSION,
         azure_endpoint=AZURE_OPENAI_ENDPOINT,
     )
 
 
-def create_chat_completion(messages: List[Dict[str, str]]) -> openai.Stream:
+def create_chat_completion(
+    messages: List[Dict[str, str]], temperature: float = None, top_p: float = None
+) -> openai.Stream:
     """Create and return a new chat completion request.
 
     Args:
@@ -98,6 +101,8 @@ def create_chat_completion(messages: List[Dict[str, str]]) -> openai.Stream:
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
         stream=True,
         stream_options={"include_usage": True},
+        temperature=temperature,
+        top_p=top_p,
     )
 
 
@@ -142,7 +147,9 @@ def count_xml_tags(text: str) -> int:
     return len(matches)
 
 
-def handle_chat_prompt(prompt: str, page: Dict) -> None:
+def handle_chat_prompt(
+    prompt: str, page: Dict, temperature: float = None, top_p: float = None
+) -> None:
     """Process a user prompt, send to Azure OpenAI and display the response.
 
     Args:
@@ -172,20 +179,36 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
         message_placeholder = st.empty()
         full_response = ""
         completion = None
-        for response in create_chat_completion(page["messages"]):
-            if response.choices:
-                try:
-                    if response.choices[0].delta is not None:
-                        full_response += response.choices[0].delta.content or ""
-                        message_placeholder.markdown(full_response + "▌")
-                    else:
-                        logger.debug(response.choices[0].model_dump_json())
-                except (AttributeError, IndexError) as e:
-                    logger.exception("Error processing response: %s", e)
-                    full_response += "An error happened, retry your request.\n"
-            else:
-                logger.warning("Received empty response from OpenAI API")
-            completion = response
+        try:
+            logger.debug(
+                "Creating chat completion with %s temperature and %s top_p",
+                temperature,
+                top_p,
+            )
+            for response in create_chat_completion(
+                page["messages"], temperature=temperature, top_p=top_p
+            ):
+                if response.choices:
+                    try:
+                        if response.choices[0].delta is not None:
+                            full_response += response.choices[0].delta.content or ""
+                            message_placeholder.markdown(full_response + "▌")
+                        else:
+                            logger.debug(response.choices[0].model_dump_json())
+                    except (AttributeError, IndexError) as e:
+                        logger.exception("Error processing response: %s", e)
+                        full_response += "An error happened, retry your request.\n"
+                else:
+                    logger.warning(
+                        "[%s] Received empty response from OpenAI API. %s",
+                        page["name"],
+                        response,
+                    )
+                completion = response
+        finally:
+            # Ensure we always clear the placeholder even if an error occurs
+            if not full_response:
+                st.markdown("Error: No response received from the model, try again.")
 
         logger.debug("Full response before rendering: %s", full_response)
         # Clear the placeholder after streaming
@@ -333,6 +356,8 @@ def render_response(response_text: str) -> None:
                 diagram_type = "gantt"
             elif diagram_code.strip().startswith("pie"):
                 diagram_type = "pie"
+            elif diagram_code.strip().startswith("journey"):
+                diagram_type = "journey"
 
             # Calculate complexity metrics
             line_count = diagram_code.count("\n") + 1
@@ -366,6 +391,9 @@ def render_response(response_text: str) -> None:
             elif diagram_type == "pie":
                 # Pie charts are generally more compact
                 height = max(line_count * 20, 400)
+            elif diagram_type == "journey":
+                # Journey diagrams height is inversely proportional to length
+                height = max(300, 3000 // line_count)
             else:
                 # Default calculation for unknown types
                 height = max(line_count * 30, node_count * 70, 500)
@@ -378,8 +406,9 @@ def render_response(response_text: str) -> None:
             height = int(height * scale_factor)
 
             # Use container width to adapt to page size
-            result = st_mermaid(diagram_code, height=height, width="container")
-            logger.debug(result)
+            st_mermaid(
+                diagram_code, height=height, width="container", pan=False, zoom=False
+            )
         except Exception as e:
             logger.exception("Error rendering mermaid diagram: %s", e)
             st.error(f"Failed to render diagram: {e}")
