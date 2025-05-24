@@ -31,12 +31,7 @@ import streamlit as st
 from st_copy import copy_button
 
 from agent_registry import agent_registry
-from utils.diagram_settings import render_diagram_settings_sidebar
-from utils.openai_utils import (
-    handle_chat_prompt,
-    load_prompt_files,
-    render_response_with_mermaid,
-)
+from utils.openai_utils import handle_chat_prompt, load_prompt_files, render_response
 
 
 @st.cache_data
@@ -155,7 +150,7 @@ def multiagent_page(
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
-                    render_response_with_mermaid(msg)
+                    render_response(msg)
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
 
@@ -212,7 +207,7 @@ def agent_page(
         st.subheader(subtitle)
 
         # Add diagram settings in sidebar if needed
-        render_diagram_settings_sidebar()
+        # render_diagram_settings_sidebar()
 
         if "pages" not in st.session_state:
             st.session_state.pages = {}
@@ -230,7 +225,7 @@ def agent_page(
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
-                    render_response_with_mermaid(msg)
+                    render_response(msg)
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
 

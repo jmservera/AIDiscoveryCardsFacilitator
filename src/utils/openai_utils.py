@@ -187,7 +187,7 @@ def handle_chat_prompt(prompt: str, page: Dict) -> None:
         message_placeholder.empty()
 
         # Render the response text with potential Mermaid diagrams
-        render_response_with_mermaid(full_response)
+        render_response(full_response)
 
     # Add the response to the messages
     page["messages"].append({"role": "assistant", "content": full_response})
@@ -281,8 +281,9 @@ def extract_mermaid_diagrams(text: str) -> List[Tuple[str, str]]:
     return results
 
 
-def render_response_with_mermaid(response_text: str) -> None:
-    """Render the response text with Mermaid diagrams.
+def render_response(response_text: str) -> None:
+    """Render the response text in Markdown.
+       Supports Mermaid diagrams.
 
     Args:
         response_text: The full text response that may contain Mermaid diagrams
