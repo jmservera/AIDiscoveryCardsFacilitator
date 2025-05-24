@@ -19,6 +19,16 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "temperature": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                    },
+                    "top_p": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
                     }
                 },
                 "required": [

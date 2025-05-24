@@ -98,7 +98,7 @@ def get_system_messages_multiagent(
 
 def multiagent_page(
     personas: List[str],
-    title: str,
+    header: str,
     subtitle: str,
     documents: Optional[List[str]] = None,
 ) -> Callable[[], None]:
@@ -114,7 +114,7 @@ def multiagent_page(
     personas : list[str]
         A list of persona or role prompt file names that the assistant should adopt in the
         conversation.
-    title : str
+    header : str
         The title to display at the top of the page.
     subtitle : str
         The subtitle to display below the title.
@@ -139,14 +139,16 @@ def multiagent_page(
     """
 
     def page() -> None:
-        st.title(title)
+        st.title(header)
         st.subheader(subtitle)
 
         if "pages" not in st.session_state:
             st.session_state.pages = {}
 
         if st.context.url not in st.session_state.pages:
-            st.session_state.pages[st.context.url] = {}
+            st.session_state.pages[st.context.url] = {
+                "name": header or "Multi-Agent Chat",
+            }
 
         page = st.session_state.pages[st.context.url]
         # Initialize chat history
@@ -174,6 +176,8 @@ def agent_page(
     documents: Optional[Union[str, List[str]]] = None,
     header: Optional[str] = None,
     subtitle: Optional[str] = None,
+    temperature: float = None,
+    top_p: float = None,
 ) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with an agent persona.
@@ -211,6 +215,20 @@ def agent_page(
     """
 
     def page() -> None:
+        st.write(
+            """
+            <style>
+                div[data-testid="stColumn"] {
+                    width: fit-content !important;
+                    flex: unset;
+                }
+                div[data-testid="stColumn"] * {
+                    width: fit-content !important;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         st.title(header)
         st.subheader(subtitle)
 
@@ -221,7 +239,7 @@ def agent_page(
             st.session_state.pages = {}
 
         if st.context.url not in st.session_state.pages:
-            st.session_state.pages[st.context.url] = {}
+            st.session_state.pages[st.context.url] = {"name": header or "Agent Chat"}
 
         page = st.session_state.pages[st.context.url]
         # Initialize chat history
@@ -243,11 +261,28 @@ def agent_page(
 
         if prompt := st.chat_input("Enter a message:"):
             logger.debug("Received user prompt: %s", prompt)
-            handle_chat_prompt(prompt, page)
+            handle_chat_prompt(prompt, page, temperature, top_p)
 
             logger.debug("Adding reset button.")
-            reset_button_key = "reset_button"
-            reset_button = st.button("Reset Chat", key=reset_button_key)
+
+        # run the prompt again
+        col1, col2 = st.columns([1, 1], gap="small")
+        with col1:
+            rerun_prompt_button = st.button("Rerun Prompt")
+            if rerun_prompt_button:
+                if msg_count > 0:
+                    logger.debug("Rerunning prompt with %d messages.", msg_count)
+                    message = page["messages"][-1]
+                    page["messages"].pop()
+                    if message["role"] != "user":
+                        message = page["messages"][-1]  # Get the last user message
+                        page["messages"].pop()
+
+                    handle_chat_prompt(message["content"], page)
+                else:
+                    st.warning("No messages to rerun.")
+        with col2:
+            reset_button = st.button("Reset Chat")
             if reset_button:
                 page["messages"] = get_system_messages(persona, documents)
                 st.rerun()
@@ -294,7 +329,15 @@ def agent_page_from_key(
     elif "documents" in agent:
         documents = agent["documents"]
 
-    return agent_page(persona, documents, header, subtitle)
+    temperature = None
+    if "temperature" in agent:
+        temperature = agent["temperature"]
+
+    top_p = None
+    if "top_p" in agent:
+        top_p = agent["top_p"]
+
+    return agent_page(persona, documents, header, subtitle, temperature, top_p)
 
 
 class PageFactory:

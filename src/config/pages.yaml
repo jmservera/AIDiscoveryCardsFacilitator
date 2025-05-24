@@ -20,6 +20,7 @@ agents:
   facilitator:
     persona: prompts/facilitator_persona.md
     document: prompts/ai_discovery_cards.md
+    temperature: 0.7
   zermatt_national_bank:
     persona: prompts/contoso_zermatt_national_bank_persona.md
     document: prompts/contoso_zermatt_national_bank.md
@@ -29,6 +30,7 @@ agents:
   design_thinking_expert:
     persona: prompts/design_thinking_persona.md
     document: prompts/design_thinking.md
+    temperature: 0.9
   multi_doc_expert:
     persona: prompts/facilitator_persona.md
     documents:
