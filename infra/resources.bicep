@@ -26,12 +26,17 @@ var deployments = [
   {
     name: 'gpt-4o'
     skuName: 'GlobalStandard'
-    modelVersion: '2024-05-13'
+    modelVersion: '2024-08-06'
   }
   {
     name: 'text-embedding-ada-002'
     skuName: 'Standard'
     modelVersion: '2'
+  }
+  {
+    name: 'o4-mini'
+    skuName: 'GlobalStandard'
+    modelVersion: '2025-04-16'
   }
 ]
 

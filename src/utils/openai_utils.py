@@ -30,7 +30,7 @@ Key Features:
 
 Environment Variables:
 - AZURE_OPENAI_ENDPOINT: The endpoint URL for Azure OpenAI
-- AZURE_OPENAI_DEPLOYMENT_NAME: The deployment name to use (defaults to "gpt-4o")
+
 
 Dependencies:
 - openai: Main client for interacting with OpenAI API
@@ -58,7 +58,6 @@ logger = get_logger(__name__)
 load_dotenv()
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
 
@@ -81,7 +80,9 @@ def get_client() -> openai.AzureOpenAI:
 
 
 def create_chat_completion(
-    messages: List[Dict[str, str]], temperature: float = None, top_p: float = None
+    messages: List[Dict[str, str]],
+    model: str,
+    temperature: float = 1,
 ) -> openai.Stream:
     """Create and return a new chat completion request.
 
@@ -94,15 +95,16 @@ def create_chat_completion(
 
     client = get_client()
 
-    logger.debug("Creating chat completion with %d messages", len(messages))
+    logger.debug(
+        "Creating chat completion for %d messages with model %s", len(messages), model
+    )
     # Create and return a new chat completion request
     return client.chat.completions.create(
-        model=AZURE_OPENAI_DEPLOYMENT_NAME,
+        model=model,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
         stream=True,
         stream_options={"include_usage": True},
         temperature=temperature,
-        top_p=top_p,
     )
 
 
@@ -148,7 +150,10 @@ def count_xml_tags(text: str) -> int:
 
 
 def handle_chat_prompt(
-    prompt: str, page: Dict, temperature: float = None, top_p: float = None
+    prompt: str,
+    page: Dict,
+    model: str,
+    temperature: float = None,
 ) -> None:
     """Process a user prompt, send to Azure OpenAI and display the response.
 
@@ -182,12 +187,12 @@ def handle_chat_prompt(
         completion = None
         try:
             logger.debug(
-                "Creating chat completion with %s temperature and %s top_p",
+                "Creating chat completion with %s temperature for model %s",
                 temperature,
-                top_p,
+                model,
             )
             for response in create_chat_completion(
-                page["messages"], temperature=temperature, top_p=top_p
+                page["messages"], model=model, temperature=temperature
             ):
                 if response.choices:
                     try:

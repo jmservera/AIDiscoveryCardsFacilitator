@@ -98,6 +98,7 @@ def get_system_messages_multiagent(
 
 def multiagent_page(
     personas: List[str],
+    model: str,
     header: str,
     subtitle: str,
     documents: Optional[List[str]] = None,
@@ -166,18 +167,18 @@ def multiagent_page(
 
         # Await a user message and handle the chat prompt when it comes in.
         if prompt := st.chat_input("Enter a message:"):
-            handle_chat_prompt(prompt, page)
+            handle_chat_prompt(prompt, page, model)
 
     return page
 
 
 def agent_page(
     persona: str,
+    model: str,
     documents: Optional[Union[str, List[str]]] = None,
     header: Optional[str] = None,
     subtitle: Optional[str] = None,
     temperature: float = None,
-    top_p: float = None,
 ) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with an agent persona.
@@ -261,7 +262,7 @@ def agent_page(
 
         if prompt := st.chat_input("Enter a message:"):
             logger.debug("Received user prompt: %s", prompt)
-            handle_chat_prompt(prompt, page, temperature, top_p)
+            handle_chat_prompt(prompt, page, model, temperature)
 
         logger.debug("Adding reset button.")
         # run the prompt again
@@ -281,7 +282,7 @@ def agent_page(
                         message = page["messages"][-1]  # Get the last user message
                         page["messages"].pop()
 
-                    handle_chat_prompt(message["content"], page)
+                    handle_chat_prompt(message["content"], page, model, temperature)
                 else:
                     st.warning("No messages to rerun.")
         with col2:
@@ -326,6 +327,7 @@ def agent_page_from_key(
 
     # Get the persona path
     persona = agent["persona"]
+    model = agent["model"]
 
     # Get document(s) - could be a single document or a list
     documents = None
@@ -338,11 +340,7 @@ def agent_page_from_key(
     if "temperature" in agent:
         temperature = agent["temperature"]
 
-    top_p = None
-    if "top_p" in agent:
-        top_p = agent["top_p"]
-
-    return agent_page(persona, documents, header, subtitle, temperature, top_p)
+    return agent_page(persona, model, documents, header, subtitle, temperature)
 
 
 class PageFactory:
@@ -437,6 +435,7 @@ page_factory.register(
         if "agent" in cfg
         else agent_page(
             cfg["persona"],
+            cfg.get("model", "gpt-4o"),
             cfg.get(
                 "documents", cfg.get("document")
             ),  # Try documents first, then document
@@ -449,6 +448,7 @@ page_factory.register(
     "multiagent",
     lambda cfg: multiagent_page(
         cfg["personas"],
+        cfg.get("model", "gpt-4o"),
         cfg["header"],
         cfg["subtitle"],
         cfg.get("documents", None),

@@ -20,19 +20,23 @@ agents:
   facilitator:
     persona: prompts/facilitator_persona.md
     document: prompts/ai_discovery_cards.md
-    temperature: 0.7
+    model: o4-mini
+    temperature: 1
   zermatt_national_bank:
     persona: prompts/contoso_zermatt_national_bank_persona.md
     document: prompts/contoso_zermatt_national_bank.md
     temperature: 0.5
+    model: gpt-4o
   andermatt_works:
     persona: prompts/contoso_andermatt_works_persona.md
     document: prompts/contoso_andermatt_works.md
     temperature: 0.5
+    model: gpt-4o
   design_thinking_expert:
     persona: prompts/design_thinking_persona.md
     document: prompts/design_thinking.md
-    temperature: 0.9
+    model: o4-mini
+    temperature: 1
   multi_doc_expert:
     persona: prompts/facilitator_persona.md
     documents:
