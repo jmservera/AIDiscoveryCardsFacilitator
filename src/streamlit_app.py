@@ -33,7 +33,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
-from openai_page import create_page
+from page import PageFactory
 
 AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 
@@ -110,7 +110,7 @@ def main() -> None:
                         if is_new_section:
                             pages[section] = []
                             is_new_section = False
-                        page_func = create_page(page_config)
+                        page_func = PageFactory.create_page(page_config)
                         page = st.Page(
                             page_func,
                             title=page_config["title"],

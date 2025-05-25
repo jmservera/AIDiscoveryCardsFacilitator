@@ -237,6 +237,7 @@ def handle_chat_prompt(
         )
 
 
+@st.cache_data
 def load_prompt_files(
     persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
 ) -> List[Dict[str, str]]:
