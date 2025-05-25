@@ -2,3 +2,5 @@
 showSidebarNavigation = true
 toolbarMode = "minimal"
 showErrorDetails = "none"
+[browser]
+gatherUsageStats = false # prevent sending telemetry to fivetran
