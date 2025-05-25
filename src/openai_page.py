@@ -32,7 +32,7 @@ from st_copy import copy_button
 from streamlit.logger import get_logger
 
 from agent_registry import agent_registry
-from utils.openai_utils import handle_chat_prompt, load_prompt_files, render_response
+from utils.openai_utils import handle_chat_prompt, load_prompt_files, render_message
 
 logger = get_logger(__name__)
 
@@ -160,7 +160,7 @@ def multiagent_page(
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
-                    render_response(msg)
+                    render_message(msg)
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
 
@@ -252,7 +252,7 @@ def agent_page(
             if message["role"] != "system":
                 with st.chat_message(message["role"]):
                     msg = message["content"]
-                    render_response(msg)
+                    render_message(msg)
                     msg_count += 1
                     if message["role"] == "assistant":
                         copy_button(msg, key=msg)
@@ -263,12 +263,15 @@ def agent_page(
             logger.debug("Received user prompt: %s", prompt)
             handle_chat_prompt(prompt, page, temperature, top_p)
 
-            logger.debug("Adding reset button.")
-
+        logger.debug("Adding reset button.")
         # run the prompt again
         col1, col2 = st.columns([1, 1], gap="small")
         with col1:
-            rerun_prompt_button = st.button("Rerun Prompt")
+            rerun_prompt_button = st.button(
+                "🔄",
+                help="Rerun the last prompt",
+                use_container_width=True,
+            )
             if rerun_prompt_button:
                 if msg_count > 0:
                     logger.debug("Rerunning prompt with %d messages.", msg_count)
@@ -282,7 +285,9 @@ def agent_page(
                 else:
                     st.warning("No messages to rerun.")
         with col2:
-            reset_button = st.button("Reset Chat")
+            reset_button = st.button(
+                "🧹", help="Clear chat history", use_container_width=True
+            )
             if reset_button:
                 page["messages"] = get_system_messages(persona, documents)
                 st.rerun()

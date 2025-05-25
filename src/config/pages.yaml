@@ -24,9 +24,11 @@ agents:
   zermatt_national_bank:
     persona: prompts/contoso_zermatt_national_bank_persona.md
     document: prompts/contoso_zermatt_national_bank.md
+    temperature: 0.5
   andermatt_works:
     persona: prompts/contoso_andermatt_works_persona.md
     document: prompts/contoso_andermatt_works.md
+    temperature: 0.5
   design_thinking_expert:
     persona: prompts/design_thinking_persona.md
     document: prompts/design_thinking.md
@@ -54,6 +56,7 @@ sections:
       url_path: DesignThinkingExpert
       header: 💡 AI Design Thinking Expert
       subtitle: I'm your AI Design Thinking Expert and can guide you through the Design Thinking process step by step.
+      admin_only: true # Only visible to admins
   Customers:
     - type: agent
       agent: zermatt_national_bank
@@ -71,10 +74,10 @@ sections:
       header: 🏗️ Contoso Andermatt Works Representative
       subtitle: Ask me anything about our construction company, internal processes and our day-to-day jobs.
 
-    - type: agent
-      agent: multi_doc_expert
-      title: Multi-Doc Expert
-      icon: 📚
-      url_path: MultiDocExpert
-      header: 📚 Multi-Document Expert
-      subtitle: I'm grounded in multiple documents to demonstrate the multi-document capability.
+    # - type: agent
+    #   agent: multi_doc_expert
+    #   title: Multi-Doc Expert
+    #   icon: 📚
+    #   url_path: MultiDocExpert
+    #   header: 📚 Multi-Document Expert
+    #   subtitle: I'm grounded in multiple documents to demonstrate the multi-document capability.

@@ -177,6 +177,7 @@ def handle_chat_prompt(
     # Send the user's prompt to Azure OpenAI and display the response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
+        message_placeholder.markdown("*Generating response...*")
         full_response = ""
         completion = None
         try:
@@ -215,7 +216,7 @@ def handle_chat_prompt(
         message_placeholder.empty()
 
         # Render the response text with potential Mermaid diagrams
-        render_response(full_response)
+        render_message(full_response)
 
     # Add the response to the messages
     page["messages"].append({"role": "assistant", "content": full_response})
@@ -309,28 +310,28 @@ def extract_mermaid_diagrams(text: str) -> List[Tuple[str, str]]:
     return results
 
 
-def render_response(response_text: str) -> None:
-    """Render the response text in Markdown.
+def render_message(message: str) -> None:
+    """Render the Markdown text.
        Supports Mermaid diagrams.
 
     Args:
-        response_text: The full text response that may contain Mermaid diagrams
+        message: The full text response that may contain Mermaid diagrams
 
     Returns:
         None - renders the content directly to the Streamlit UI
     """
     logger.debug("Rendering response text with potential Mermaid diagrams")
     # Extract mermaid diagrams from the response
-    mermaid_diagrams = extract_mermaid_diagrams(response_text)
+    mermaid_diagrams = extract_mermaid_diagrams(message)
 
     if not mermaid_diagrams:
         # If no mermaid diagrams, just display the full response
-        st.markdown(response_text)
+        st.markdown(message)
         return
 
     logger.info("Found %d mermaid diagrams in the response", len(mermaid_diagrams))
     # Process text with mermaid diagrams
-    remaining_text = response_text
+    remaining_text = message
 
     for full_match, diagram_code in mermaid_diagrams:
         # Split the text at the diagram position

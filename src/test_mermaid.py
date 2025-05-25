@@ -8,7 +8,7 @@ from streamlit_mermaid import st_mermaid
 from utils.openai_utils import (
     extract_mermaid_diagrams,
     get_diagram_scale_factor,
-    render_response,
+    render_message,
     set_diagram_scale_factor,
 )
 
@@ -127,7 +127,7 @@ st.write(f"Found {len(diagrams)} diagrams")
 # Render using our utility function
 st.markdown("### Testing Render Response With Mermaid")
 st.write("The diagrams should be rendered below:")
-render_response(test_text)
+render_message(test_text)
 
 # Test with complex diagram
 st.markdown("### Testing Complex Diagram Auto-Sizing")
@@ -141,7 +141,7 @@ complex_text = f"""Here's a larger, more complex diagram to test our auto-sizing
 
 And more text after the large diagram."""
 
-render_response(complex_text)
+render_message(complex_text)
 
 # Test with wide diagram
 st.markdown("### Testing Wide Diagram Flex Width")
@@ -165,7 +165,7 @@ wide_text = f"""Here's a wide diagram that should adapt to page width:
 
 And some text after the wide diagram."""
 
-render_response(wide_text)
+render_message(wide_text)
 
 # Test with multiple diagram types
 st.markdown("### Testing Multiple Diagram Types")
