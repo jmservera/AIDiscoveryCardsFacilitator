@@ -27,7 +27,7 @@ import streamlit as st
 from st_copy import copy_button
 from streamlit.logger import get_logger
 
-from agent_registry import MultiAgent, SingleAgent, agent_registry
+from agents import MultiAgent, SingleAgent, agent_registry
 from utils.openai_utils import handle_chat_prompt, render_message
 
 logger = get_logger(__name__)
@@ -186,9 +186,7 @@ class AgentPage(Page):
                     "Received user prompt: %s",
                     prompt[:30] + "..." if len(prompt) > 30 else prompt,
                 )
-                handle_chat_prompt(
-                    prompt, page, self.agent.model, self.agent.temperature
-                )
+                handle_chat_prompt(prompt, page, agent=self.agent)
 
             # Add control buttons
             self._add_control_buttons(page, msg_count)
@@ -224,12 +222,7 @@ class AgentPage(Page):
                         message = page["messages"][-1]  # Get the last user message
                         page["messages"].pop()
 
-                    handle_chat_prompt(
-                        message["content"],
-                        page,
-                        self.agent.model,
-                        self.agent.temperature,
-                    )
+                    handle_chat_prompt(message["content"], page, agent=self.agent)
                 else:
                     st.warning("No messages to rerun.")
 
@@ -302,9 +295,7 @@ class MultiAgentPage(Page):
                     "Received user prompt for multi-agent: %s",
                     prompt[:30] + "..." if len(prompt) > 30 else prompt,
                 )
-                handle_chat_prompt(
-                    prompt, page, self.agent.model, self.agent.temperature
-                )
+                handle_chat_prompt(prompt, page, agent=self.agent)
 
             # Add control buttons
             self._add_control_buttons(page, msg_count)
@@ -339,9 +330,7 @@ class MultiAgentPage(Page):
                     message = page["messages"][-1]  # Get the last user message
                     page["messages"].pop()
 
-                handle_chat_prompt(
-                    message["content"], page, self.agent.model, self.agent.temperature
-                )
+                handle_chat_prompt(message["content"], page, agent=self.agent)
             elif rerun_prompt_button and msg_count == 0:
                 st.warning("No messages to rerun.")
 
@@ -382,9 +371,6 @@ class PageFactory:
                 "Creating page of type '%s' with header '%s'", page_type, header
             )
 
-            # Import here to avoid circular imports
-            from agent_impl import MultiAgentImpl, SingleAgentImpl
-
             # Check if we're using agent_key or direct configuration
             if "agent" in page_config:
                 # Using agent key from registry
@@ -407,13 +393,13 @@ class PageFactory:
                 personas = page_config["personas"]
                 model = page_config.get("model", "gpt-4o")
                 documents = page_config.get("documents")
-                temperature = page_config.get("temperature", 0.7)
+                temperature = page_config.get("temperature", 1)
 
                 logger.debug(
                     "Creating custom MultiAgent with %d personas", len(personas)
                 )
 
-                agent = MultiAgentImpl(
+                agent = MultiAgent(
                     agent_key="_custom_",  # Using a placeholder key
                     personas=personas,
                     model=model,
@@ -428,7 +414,7 @@ class PageFactory:
                 model = page_config.get("model", "gpt-4o")
                 document = page_config.get("document")
                 documents = page_config.get("documents")
-                temperature = page_config.get("temperature", 0.7)
+                temperature = page_config.get("temperature", 1)
 
                 # Determine document source
                 doc_source = None
@@ -439,7 +425,7 @@ class PageFactory:
 
                 logger.debug("Creating custom SingleAgent with persona %s", persona)
 
-                agent = SingleAgentImpl(
+                agent = SingleAgent(
                     agent_key="_custom_",  # Using a placeholder key
                     persona=persona,
                     model=model,
