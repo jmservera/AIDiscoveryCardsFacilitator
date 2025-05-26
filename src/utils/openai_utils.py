@@ -39,73 +39,19 @@ Dependencies:
 - tiktoken: For token counting
 """
 
-import os
 import re
 from typing import Dict, List, Optional, Tuple, Union
 
-import openai
 import streamlit as st
 import tiktoken
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from dotenv import load_dotenv
 from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
 
+from agents.agent import Agent
+
 # Configure logging using Streamlit's logger
 logger = get_logger(__name__)
-
-load_dotenv()
-
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-
-
-@st.cache_resource
-def get_client() -> openai.AzureOpenAI:
-    """Get the Azure OpenAI client using DefaultAzureCredential.
-
-    Returns:
-        An authenticated Azure OpenAI client
-    """
-    token_provider = get_bearer_token_provider(
-        DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-    )
-
-    return openai.AzureOpenAI(
-        azure_ad_token_provider=token_provider,
-        api_version=AZURE_OPENAI_API_VERSION,
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    )
-
-
-def create_chat_completion(
-    messages: List[Dict[str, str]],
-    model: str,
-    temperature: float = 1,
-) -> openai.Stream:
-    """Create and return a new chat completion request.
-
-    Args:
-        messages: List of message objects with role and content
-
-    Returns:
-        A streaming response from Azure OpenAI
-    """
-
-    client = get_client()
-
-    logger.debug(
-        "Creating chat completion for %d messages with model %s", len(messages), model
-    )
-    # Create and return a new chat completion request
-    return client.chat.completions.create(
-        model=model,
-        messages=[{"role": m["role"], "content": m["content"]} for m in messages],
-        stream=True,
-        stream_options={"include_usage": True},
-        temperature=temperature,
-    )
 
 
 def count_tokens(messages: List[Dict[str, str]]) -> int:
@@ -149,17 +95,13 @@ def count_xml_tags(text: str) -> int:
     return len(matches)
 
 
-def handle_chat_prompt(
-    prompt: str,
-    page: Dict,
-    model: str,
-    temperature: float = None,
-) -> None:
+def handle_chat_prompt(prompt: str, page: Dict, agent: Agent) -> None:
     """Process a user prompt, send to Azure OpenAI and display the response.
 
     Args:
         prompt: The user's text input
         page: Dictionary containing page state including messages history
+        agent: Agent instance to use for chat completion
 
     Returns:
         None - updates the session state and UI directly
@@ -187,13 +129,12 @@ def handle_chat_prompt(
         completion = None
         try:
             logger.debug(
-                "Creating chat completion with %s temperature for model %s",
-                temperature,
-                model,
+                "Creating chat completion using agent %s with model %s and temperature %s",
+                agent.agent_key,
+                agent.model,
+                agent.temperature,
             )
-            for response in create_chat_completion(
-                page["messages"], model=model, temperature=temperature
-            ):
+            for response in agent.create_chat_completion(page["messages"]):
                 if response.choices:
                     try:
                         if response.choices[0].delta is not None:
@@ -237,6 +178,7 @@ def handle_chat_prompt(
         )
 
 
+@st.cache_data
 def load_prompt_files(
     persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
 ) -> List[Dict[str, str]]:
@@ -250,9 +192,11 @@ def load_prompt_files(
     Returns:
         List of message objects with the system prompts loaded
     """
+    logger.debug("Loading system messages from persona file: %s", persona_file_path)
     # Read the persona file
     with open(persona_file_path, "r", encoding="utf-8") as f:
         system_prompt = f.read()
+    logger.debug("Adding guardrails to system prompt")
     # Add security instructions to the system prompt
     with open("prompts/guardrails.md", "r", encoding="utf-8") as f:
         system_prompt += f.read()
@@ -268,6 +212,7 @@ def load_prompt_files(
         # Process each content file
         for file_path in content_file_paths:
             try:
+                logger.debug("Loading content from file: %s", file_path)
                 with open(file_path, "r", encoding="utf-8") as f:
                     system_document = f.read()
                     messages.append(

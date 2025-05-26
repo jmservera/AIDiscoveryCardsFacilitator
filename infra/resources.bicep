@@ -83,6 +83,7 @@ resource web 'Microsoft.Web/sites@2022-03-01' = {
       SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
       ENABLE_ORYX_BUILD: 'true'
       AZURE_OPENAI_ENDPOINT: 'https://${azureOpenAI.name}.openai.azure.com/'
+      AZURE_OPENAI_API_VERSION: azureOpenAI.apiVersion
     }
   }
 
@@ -154,3 +155,4 @@ resource cognitiveServicesOpenAIUserForAppService 'Microsoft.Authorization/roleA
 
 output WEB_URI string = 'https://${web.properties.defaultHostName}'
 output AZURE_OPENAI_ENDPOINT string = 'https://${azureOpenAI.name}.openai.azure.com/'
+output AZURE_OPENAI_API_VERSION string = azureOpenAI.apiVersion
