@@ -44,18 +44,19 @@ class MultiAgent(Agent):
         temperature: float = 0.7,
     ) -> None:
         """
-        Initialize a SingleAgent with a specific persona.
+        Initialize a MultiAgent with multiple personas and optional document contexts.
 
         Parameters:
         -----------
         agent_key : str
             Unique identifier for the agent.
-        persona : str
-            Path to the persona prompt file.
+        personas : List[str]
+            A list of paths to persona prompt files.
         model : str, optional
             The model to use for this agent. Defaults to "gpt-4o".
         documents : Optional[Union[str, List[str]]], optional
-            Path(s) to document context file(s). Defaults to None.
+            Path(s) to document context file(s). If provided, each persona can be
+            associated with a corresponding document. Defaults to None.
         temperature : float, optional
             The temperature setting for response generation. Defaults to 0.7.
         """
