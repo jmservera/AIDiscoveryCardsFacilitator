@@ -5,6 +5,7 @@ targetScope = 'subscription'
 @description('Name of the the environment which is used to generate a short unique hash used in all resources.')
 param name string
 param principalId string
+param principalType string = 'User'
 
 @minLength(1)
 @description('Primary location for all resources')
@@ -27,6 +28,7 @@ module resources 'resources.bicep' = {
     resourceToken: resourceToken
     tags: tags
     principalId: principalId
+    principalType: principalType
   }
 }
 

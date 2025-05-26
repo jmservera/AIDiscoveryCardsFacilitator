@@ -4,6 +4,7 @@ param location string
 param resourceToken string
 param tags object
 param principalId string
+param principalType string
 
 var abbrs = loadJsonContent('./abbreviations.json')
 
@@ -135,7 +136,7 @@ resource cognitiveServicesOpenAIUserForUser 'Microsoft.Authorization/roleAssignm
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
     principalId: principalId
-    principalType: 'User'
+    principalType: principalType
   }
 }
 

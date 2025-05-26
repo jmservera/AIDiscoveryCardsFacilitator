@@ -67,7 +67,26 @@ def initialize_authentication():
     )
 
 
+def save_auth_config(configuration: Any) -> None:
+    """
+    Saves the current authentication configuration to the auth-config.yaml file.
+
+    This function writes the current authentication configuration
+    back to the auth-config.yaml file, ensuring that any changes made during the session are
+    persisted for future use, and encrypts sensitive information like passwords.
+    """
+    with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as file:
+        yaml.dump(configuration, file, default_flow_style=False, allow_unicode=True)
+
+
+# Initialize authentication and load configuration
 authenticator, config = initialize_authentication()
+
+# if you modified the config, save it back to the file.
+# This will encrypt the passwords and save the configuration.
+# Uncomment the following line if you want to save changes to the auth config.
+# Note: This is optional and should be used with caution as it modifies the auth-config.yaml file.
+# save_auth_config(config)
 
 
 def clear(_: Any) -> None:
@@ -88,53 +107,44 @@ def login_page() -> None:
 
 def main() -> None:
     """Main function to run the Streamlit application."""
-    try:
-        if st.session_state.get("authentication_status"):
-            # Load pages from pages.yaml file
-            try:
-                with open("./config/pages.yaml", encoding="utf-8") as file:
-                    pages_config = yaml.load(file, Loader=SafeLoader)
+    if st.session_state.get("authentication_status"):
+        # Load pages from pages.yaml file
+        try:
+            with open("./config/pages.yaml", encoding="utf-8") as file:
+                pages_config = yaml.load(file, Loader=SafeLoader)
 
-                # Determine if the user is an admin
-                user_roles = st.session_state.get("roles")
-                is_admin = "admin" in user_roles
+            # Determine if the user is an admin
+            user_roles = st.session_state.get("roles")
+            is_admin = "admin" in user_roles
 
-                # Convert YAML configuration to streamlit pages structure
-                pages = {}
-                for section, section_pages in pages_config["sections"].items():
-                    is_new_section = True
-                    for page_config in section_pages:
-                        # Hide admin_only pages for non-admins
-                        if page_config.get("admin_only", False) and not is_admin:
-                            continue
-                        if is_new_section:
-                            pages[section] = []
-                            is_new_section = False
-                        page_func = PageFactory.create_page(page_config)
-                        page = st.Page(
-                            page_func,
-                            title=page_config["title"],
-                            icon=page_config["icon"],
-                            url_path=page_config["url_path"],
-                        )
-                        pages[section].append(page)
+            # Convert YAML configuration to streamlit pages structure
+            pages = {}
+            for section, section_pages in pages_config["sections"].items():
+                is_new_section = True
+                for page_config in section_pages:
+                    # Hide admin_only pages for non-admins
+                    if page_config.get("admin_only", False) and not is_admin:
+                        continue
+                    if is_new_section:
+                        pages[section] = []
+                        is_new_section = False
+                    page_func = PageFactory.create_page(page_config)
+                    page = st.Page(
+                        page_func,
+                        title=page_config["title"],
+                        icon=page_config["icon"],
+                        url_path=page_config["url_path"],
+                    )
+                    pages[section].append(page)
 
-                pg = st.navigation(pages, position="sidebar")
-                authenticator.logout(location="sidebar", callback=clear)
-                pg.run()
-            except (yaml.YAMLError, FileNotFoundError) as page_error:
-                st.error(f"Error loading pages configuration: {page_error}")
-
-        else:
-            pg = st.navigation([login_page], position="hidden")
+            pg = st.navigation(pages, position="sidebar")
+            authenticator.logout(location="sidebar", callback=clear)
             pg.run()
-        # with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as file:
-        #     yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
-    except (
-        yaml.YAMLError,
-        FileNotFoundError,
-    ) as e:
-        st.error(e)
+        except (yaml.YAMLError, FileNotFoundError) as page_error:
+            st.error(f"Error loading pages configuration: {page_error}")
+    else:
+        pg = st.navigation([login_page], position="hidden")
+        pg.run()
 
 
 if __name__ == "__main__":
