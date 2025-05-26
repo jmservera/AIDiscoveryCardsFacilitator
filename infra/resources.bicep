@@ -84,7 +84,7 @@ resource web 'Microsoft.Web/sites@2022-03-01' = {
       SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
       ENABLE_ORYX_BUILD: 'true'
       AZURE_OPENAI_ENDPOINT: 'https://${azureOpenAI.name}.openai.azure.com/'
-      AZURE_OPENAI_API_VERSION: azureOpenAI.apiVersion
+      AZURE_OPENAI_API_VERSION: '2025-01-01-preview' //azureOpenAI.apiVersion <- does not give the correct value
     }
   }
 
