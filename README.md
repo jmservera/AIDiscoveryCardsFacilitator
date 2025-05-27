@@ -1,4 +1,4 @@
-# Simple AI Discovery Cards Facilitator
+# AI Discovery Cards Facilitator
 
 This is a simple facilitator and a representative of a company for an AI Discovery Cards training. It runs on Streamlit and uses a simple authentication system.
 
