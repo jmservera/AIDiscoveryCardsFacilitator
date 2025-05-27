@@ -5,7 +5,11 @@ on:
     # Set this to the mainline branch you are using
     branches:
       - main
-      - master
+    paths: 
+      - 'src/**'
+      - '.github/workflows/azure-dev.yml'
+      - 'infra/**'
+      - 'azure.yaml'
 
 # GitHub Actions workflow to deploy to Azure using azd
 # To configure required secrets for connecting to Azure, simply run `azd pipeline config`
