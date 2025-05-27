@@ -42,6 +42,35 @@ agents:
 
 This allows creating more capable agents with access to multiple knowledge sources.
 
+## Testing
+
+### Running Tests Locally
+
+The project uses pytest for automated testing. To run the tests locally:
+
+1. Install the test dependencies:
+   ```bash
+   pip install -r src/requirements.txt
+   ```
+
+2. Run the tests from the project root directory:
+   ```bash
+   pytest tests/
+   ```
+
+3. To generate a coverage report:
+   ```bash
+   pytest --cov=src tests/
+   ```
+
+### Continuous Integration
+
+This project has automated testing set up with GitHub Actions. Tests will automatically run on:
+- Every push to the main branch
+- Every pull request to the main branch
+
+The workflow configuration can be found in `.github/workflows/test.yml`.
+
 ## Mermaid Diagram Support
 
 The application supports rendering Mermaid diagrams directly in chat responses. When the AI generates responses containing Mermaid diagram code blocks, they will be automatically rendered as visual diagrams.
