@@ -328,7 +328,24 @@ def render_message(message: str) -> None:
 
             # Adjust height based on diagram type and complexity
             if diagram_type == "flowchart":
-                height = max(node_count * 80, line_count * 25, 400)
+                # Flowcharts can expand horizontally or vertically, depending on the type
+                # Possible FlowChart orientations are:
+                #   TB - Top to bottom
+                #   TD - Top-down/ same as top to bottom
+                #   BT - Bottom to top
+                #   RL - Right to left
+                #   LR - Left to right
+
+                # Check for orientation in the diagram
+                if any(orientation in diagram_code for orientation in ["RL", "LR"]):
+                    # Horizontal flowcharts need less height but more width consideration
+                    height = max(300, 3000 // line_count)
+                    # But, if they contain subgraphs or complex nodes,
+                    # we still need a minimum height
+                else:
+                    # Vertical flowcharts (TB, TD, BT) need more height
+                    height = max(node_count * 80, line_count * 25, 400)
+
             elif diagram_type == "sequence":
                 # Sequence diagrams need more height per interaction
                 height = max(line_count * 30, connection_count * 60, 500)
@@ -356,10 +373,19 @@ def render_message(message: str) -> None:
             scale_factor = get_diagram_scale_factor()
             height = int(height * scale_factor)
 
-            # Use container width to adapt to page size
-            st_mermaid(
-                diagram_code, height=height, width="container", pan=False, zoom=False
-            )
+            tab1, tab2 = st.tabs(["Diagram", "Code"])
+            with tab1:
+                st_mermaid(
+                    diagram_code,
+                    height=height,
+                    width="container",
+                    pan=False,
+                    zoom=False,
+                )
+            with tab2:
+                # Use container width to adapt to page size
+                st.markdown(f"```mermaid\n{diagram_code}\n```")
+                copy_button(diagram_code, key=diagram_code)
         except Exception as e:
             logger.exception("Error rendering mermaid diagram: %s", e)
             st.error(f"Failed to render diagram: {e}")
