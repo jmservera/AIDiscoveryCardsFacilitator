@@ -15,14 +15,17 @@
             "extensions": [
                 "ms-azuretools.azure-dev",
                 "ms-azuretools.vscode-bicep",
-                "ms-python.python"
+                "ms-python.python",
+                "ms-python.black-formatter",
+                "teamsdevapp.vscode-ai-foundry",
+                "ms-python.isort"
             ]
         }
     },
     "forwardPorts": [
         8000
     ],
-    "postCreateCommand": "",
+    "postCreateCommand": "cd src && pip install -r requirements.txt",
     "remoteUser": "vscode",
     "hostRequirements": {
         "memory": "8gb"

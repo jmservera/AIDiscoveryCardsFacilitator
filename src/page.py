@@ -381,12 +381,16 @@ class PageFactory:
                 if not agent:
                     error_msg = f"Agent '{agent_key}' not found in registry"
                     logger.error(error_msg)
-                    return lambda: st.error(error_msg)
+                    raise ValueError(error_msg)
 
                 if isinstance(agent, MultiAgent):
                     page = MultiAgentPage(agent, header, subtitle)
-                else:
+                elif isinstance(agent, SingleAgent):
                     page = AgentPage(agent, header, subtitle)
+                else:
+                    error_msg = f"Unsupported agent type: {type(agent)}"
+                    logger.error(error_msg)
+                    raise TypeError(error_msg)
 
             elif page_type == "multiagent":
                 # Direct multiagent configuration
@@ -440,4 +444,4 @@ class PageFactory:
         except Exception as e:
             logger.exception("Error creating page: %s", e)
             error_msg = f"Error creating page: {str(e)}"
-            return lambda: st.error(error_msg)
+            raise ValueError(error_msg) from e
