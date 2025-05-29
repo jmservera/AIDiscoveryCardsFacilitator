@@ -24,17 +24,18 @@ Dependencies:
 """
 
 import os
-from typing import Dict, List
+from typing import Any, Dict, Iterable, List
 
 import openai
 import streamlit as st
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
+from openai.types.chat import ChatCompletionMessageParam
 from streamlit.logger import get_logger
 
 load_dotenv()
 
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
 
 logger = get_logger(__name__)
@@ -105,13 +106,30 @@ class Agent:
             azure_endpoint=AZURE_OPENAI_ENDPOINT,
         )
 
+    @staticmethod
+    def format_messages(
+        messages: List[Dict[str, Any]],
+    ) -> Iterable[ChatCompletionMessageParam]:
+        """
+        Format messages to be compatible with OpenAI's ChatCompletionMessageParam type.
+
+        Args:
+            messages: A list of message dictionaries with 'role' and 'content' keys
+
+        Returns:
+            A list of properly formatted messages compatible with OpenAI's API
+        """
+        # The typing is handled by the ChatCompletionMessageParam, which will validate
+        # that the dictionaries have the correct structure
+        return [{"role": m["role"], "content": m["content"]} for m in messages]
+
     def create_chat_completion(self, messages: List[Dict[str, str]]) -> openai.Stream:
         """
         Create and return a new chat completion request.
 
         Parameters:
         -----------
-        messages : List[Dict[str, str]]
+        messages : List[ChatCompletionMessageParam]
             List of message objects with role and content.
 
         Returns:
@@ -126,11 +144,10 @@ class Agent:
             len(messages),
             self.model,
         )
-
         # Create and return a new chat completion request
         return client.chat.completions.create(
             model=self.model,
-            messages=[{"role": m["role"], "content": m["content"]} for m in messages],
+            messages=self.format_messages(messages),
             stream=True,
             stream_options={"include_usage": True},
             temperature=self.temperature,

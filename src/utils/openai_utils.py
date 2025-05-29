@@ -44,6 +44,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import streamlit as st
 import tiktoken
+from openai.types.chat import ChatCompletionChunk
 from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
@@ -95,7 +96,9 @@ def count_xml_tags(text: str) -> int:
     return len(matches)
 
 
-def handle_chat_prompt(prompt: str, page: Dict, agent: Agent) -> None:
+def handle_chat_prompt(
+    prompt: str, messages: List[Dict[str, str]], agent: Agent
+) -> None:
     """Process a user prompt, send to Azure OpenAI and display the response.
 
     Args:
@@ -113,20 +116,20 @@ def handle_chat_prompt(prompt: str, page: Dict, agent: Agent) -> None:
         prompt = f"<documents>{prompt}</documents>"
 
     # Echo the user's prompt to the chat window
-    page["messages"].append({"role": "user", "content": prompt})
+    messages.append({"role": "user", "content": prompt})
     logger.debug("Writing user prompt to chat")
     with st.chat_message("user"):
         st.markdown(prompt)
 
     # Calculate tokens in the input
-    input_tokens = count_tokens(page["messages"])
+    input_tokens = count_tokens(messages)
     logger.debug("Input tokens: %d", input_tokens)
     # Send the user's prompt to Azure OpenAI and display the response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
         full_response = ""
-        completion = None
+        completion: Optional[ChatCompletionChunk] = None
         try:
             logger.debug(
                 "Creating chat completion using agent %s with model %s and temperature %s",
@@ -134,7 +137,8 @@ def handle_chat_prompt(prompt: str, page: Dict, agent: Agent) -> None:
                 agent.model,
                 agent.temperature,
             )
-            for response in agent.create_chat_completion(page["messages"]):
+            response: ChatCompletionChunk
+            for response in agent.create_chat_completion(messages):
                 if response.choices:
                     try:
                         if response.choices[0].delta is not None:
@@ -145,10 +149,9 @@ def handle_chat_prompt(prompt: str, page: Dict, agent: Agent) -> None:
                     except (AttributeError, IndexError) as e:
                         logger.exception("Error processing response: %s", e)
                         full_response += "An error happened, retry your request.\n"
-                else:
+                elif not response.usage:
                     logger.warning(
-                        "[%s] Received empty response from OpenAI API. %s",
-                        page["name"],
+                        "Received empty response from OpenAI API. %s",
                         response,
                     )
                 completion = response
@@ -165,7 +168,7 @@ def handle_chat_prompt(prompt: str, page: Dict, agent: Agent) -> None:
         render_message(full_response)
 
     # Add the response to the messages
-    page["messages"].append({"role": "assistant", "content": full_response})
+    messages.append({"role": "assistant", "content": full_response})
 
     # Display token usage
     if completion and completion.usage:
@@ -377,7 +380,7 @@ def render_message(message: str) -> None:
             with tab1:
                 st_mermaid(
                     diagram_code,
-                    height=height,
+                    height=str(height),
                     width="container",
                     pan=False,
                     zoom=False,

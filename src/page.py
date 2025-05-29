@@ -20,6 +20,7 @@ PageFactory:
     Factory for creating pages based on configuration.
 """
 
+import abc
 import traceback
 from typing import Callable, Dict, List
 
@@ -33,7 +34,7 @@ from utils.openai_utils import handle_chat_prompt, render_message
 logger = get_logger(__name__)
 
 
-class Page:
+class Page(abc.ABC):
     """
     Base class for page implementations.
 
@@ -63,13 +64,62 @@ class Page:
         """
         Render the page content in the Streamlit app.
 
-        This base implementation renders the common UI elements like
-        the header and subtitle. Subclasses should override this method
-        to add specific page content.
+        This implementation handles the common rendering flow including error handling
+        and session state initialization. The specific page content is delegated to
+        the _render_content method which subclasses must implement.
         """
         self._add_css()
         st.title(self.header)
         st.subheader(self.subtitle)
+
+        # Initialize session state
+        page = self._initialize_session_state()
+
+        try:
+            # Initialize chat history if needed and render specific content
+            msg_count = self._render_content(page)
+
+            # Add control buttons
+            self._add_control_buttons(page, msg_count)
+
+        except Exception as e:
+            logger.exception(f"Error rendering {self.__class__.__name__}: %s", e)
+            st.error(f"An error occurred: {str(e)}")
+            st.code(traceback.format_exc(), language="python")
+
+    @abc.abstractmethod
+    def _render_content(self, page: Dict) -> int:
+        """
+        Render the specific content of the page.
+
+        This abstract method must be implemented by subclasses to provide
+        the specific rendering logic for each page type.
+
+        Parameters:
+        -----------
+        page : Dict
+            The page's session state.
+
+        Returns:
+        --------
+        int
+            The number of messages displayed on the page.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _add_control_buttons(self, page: Dict, msg_count: int) -> None:
+        """
+        Add control buttons for rerunning prompts and resetting chat.
+
+        Parameters:
+        -----------
+        page : Dict
+            The page's session state.
+        msg_count : int
+            The number of messages in the chat history.
+        """
+        pass
 
     def _add_css(self) -> None:
         """
@@ -153,48 +203,46 @@ class AgentPage(Page):
         super().__init__(header, subtitle)
         self.agent = agent
 
-    def render(self) -> None:
+    def _render_content(self, page: Dict) -> int:
         """
-        Render the agent page with chat interface.
+        Render the agent page content.
+
+        Parameters:
+        -----------
+        page : Dict
+            The page's session state.
+
+        Returns:
+        --------
+        int
+            The number of messages displayed on the page.
         """
-        super().render()
+        # Initialize chat history
+        if "messages" not in page:
+            logger.debug("Initializing messages for agent %s", self.agent.agent_key)
+            page["messages"] = self.agent.get_system_messages()
+            logger.debug("Loaded %d system messages", len(page["messages"]))
 
-        # Initialize session state
-        page = self._initialize_session_state()
+        msg_count = 0
+        # Display chat messages from history on app rerun
+        for message in page["messages"]:
+            if message["role"] != "system":
+                with st.chat_message(message["role"]):
+                    msg = message["content"]
+                    render_message(msg)
+                    msg_count += 1
+                    if message["role"] == "assistant":
+                        copy_button(msg, key=msg)
 
-        try:
-            # Initialize chat history
-            if "messages" not in page:
-                logger.debug("Initializing messages for agent %s", self.agent.agent_key)
-                page["messages"] = self.agent.get_system_messages()
-                logger.debug("Loaded %d system messages", len(page["messages"]))
+        # Await a user message and handle the chat prompt when it comes in
+        if prompt := st.chat_input("Enter a message:"):
+            logger.info(
+                "Received user prompt: %s",
+                prompt[:30] + "..." if len(prompt) > 30 else prompt,
+            )
+            handle_chat_prompt(prompt, page["messages"], agent=self.agent)
 
-            msg_count = 0
-            # Display chat messages from history on app rerun
-            for message in page["messages"]:
-                if message["role"] != "system":
-                    with st.chat_message(message["role"]):
-                        msg = message["content"]
-                        render_message(msg)
-                        msg_count += 1
-                        if message["role"] == "assistant":
-                            copy_button(msg, key=msg)
-
-            # Await a user message and handle the chat prompt when it comes in
-            if prompt := st.chat_input("Enter a message:"):
-                logger.info(
-                    "Received user prompt: %s",
-                    prompt[:30] + "..." if len(prompt) > 30 else prompt,
-                )
-                handle_chat_prompt(prompt, page, agent=self.agent)
-
-            # Add control buttons
-            self._add_control_buttons(page, msg_count)
-
-        except Exception as e:
-            logger.exception("Error rendering agent page: %s", e)
-            st.error(f"An error occurred: {str(e)}")
-            st.code(traceback.format_exc(), language="python")
+        return msg_count
 
     def _add_control_buttons(self, page: Dict, msg_count: int) -> None:
         """
@@ -222,7 +270,9 @@ class AgentPage(Page):
                         message = page["messages"][-1]  # Get the last user message
                         page["messages"].pop()
 
-                    handle_chat_prompt(message["content"], page, agent=self.agent)
+                    handle_chat_prompt(
+                        message["content"], page["messages"], agent=self.agent
+                    )
                 else:
                     st.warning("No messages to rerun.")
 
@@ -260,50 +310,48 @@ class MultiAgentPage(Page):
         super().__init__(header, subtitle)
         self.agent = agent
 
-    def render(self) -> None:
+    def _render_content(self, page: Dict) -> int:
         """
-        Render the multi-agent page with chat interface.
+        Render the multi-agent page content.
+
+        Parameters:
+        -----------
+        page : Dict
+            The page's session state.
+
+        Returns:
+        --------
+        int
+            The number of messages displayed on the page.
         """
-        super().render()
+        # Initialize chat history
+        if "messages" not in page:
+            logger.debug(
+                "Initializing messages for multi-agent %s", self.agent.agent_key
+            )
+            page["messages"] = self.agent.get_system_messages()
+            logger.debug("Loaded %d system messages", len(page["messages"]))
 
-        # Initialize session state
-        page = self._initialize_session_state()
+        msg_count = 0
+        # Display chat messages from history on app rerun
+        for message in page["messages"]:
+            if message["role"] != "system":
+                with st.chat_message(message["role"]):
+                    msg = message["content"]
+                    render_message(msg)
+                    msg_count += 1
+                    if message["role"] == "assistant":
+                        copy_button(msg, key=msg)
 
-        try:
-            # Initialize chat history
-            if "messages" not in page:
-                logger.debug(
-                    "Initializing messages for multi-agent %s", self.agent.agent_key
-                )
-                page["messages"] = self.agent.get_system_messages()
-                logger.debug("Loaded %d system messages", len(page["messages"]))
+        # Await a user message and handle the chat prompt when it comes in.
+        if prompt := st.chat_input("Enter a message:"):
+            logger.info(
+                "Received user prompt for multi-agent: %s",
+                prompt[:30] + "..." if len(prompt) > 30 else prompt,
+            )
+            handle_chat_prompt(prompt, page["messages"], agent=self.agent)
 
-            msg_count = 0
-            # Display chat messages from history on app rerun
-            for message in page["messages"]:
-                if message["role"] != "system":
-                    with st.chat_message(message["role"]):
-                        msg = message["content"]
-                        render_message(msg)
-                        msg_count += 1
-                        if message["role"] == "assistant":
-                            copy_button(msg, key=msg)
-
-            # Await a user message and handle the chat prompt when it comes in.
-            if prompt := st.chat_input("Enter a message:"):
-                logger.info(
-                    "Received user prompt for multi-agent: %s",
-                    prompt[:30] + "..." if len(prompt) > 30 else prompt,
-                )
-                handle_chat_prompt(prompt, page, agent=self.agent)
-
-            # Add control buttons
-            self._add_control_buttons(page, msg_count)
-
-        except Exception as e:
-            logger.exception("Error rendering multi-agent page: %s", e)
-            st.error(f"An error occurred: {str(e)}")
-            st.code(traceback.format_exc(), language="python")
+        return msg_count
 
     def _add_control_buttons(self, page: Dict, msg_count: int) -> None:
         """
@@ -330,7 +378,9 @@ class MultiAgentPage(Page):
                     message = page["messages"][-1]  # Get the last user message
                     page["messages"].pop()
 
-                handle_chat_prompt(message["content"], page, agent=self.agent)
+                handle_chat_prompt(
+                    message["content"], page["messages"], agent=self.agent
+                )
             elif rerun_prompt_button and msg_count == 0:
                 st.warning("No messages to rerun.")
 
