@@ -3,28 +3,15 @@ Utility functions for interacting with Azure OpenAI API
 
 This module provides a set of utilities to authenticate, communicate with, and process
 responses from Azure OpenAI services. It handles token management, message formatting,
-and streaming chat completions using Azure OpenAI's API.
+and streaming chat completions.
+
+MIGRATION NOTE: This module has been updated to work with LangGraph-based chat workflows.
+The Agent classes now use LangGraph and LangChain's AzureChatOpenAI instead of direct 
+openai.AzureOpenAI client usage. The interface remains the same for backward compatibility.
 
 Key Features:
-        # Display the mermaid diagram
-        try:
-            # Set a more appropriate height based on number of lines in the diagram
-            # with a minimum height to ensure diagrams are properly displayed
-            line_count = diagram_code.count('\n') + 1
-            node_count = diagram_code.count('[') + diagram_code.count('{') + diagram_code.count('(')
-
-            # Adjust height based on complexity: more lines = more height
-            height = max(line_count * 30, node_count * 70, 400)  # Minimum 400px height
-
-            # Use container width (which adapts to the page width)
-            # Render the mermaid diagram with adjusted dimensions
-            st_mermaid(diagram_code, height=height, width="container")
-        except Exception as e:
-            logger.exception("Error rendering mermaid diagram: %s", e)
-            st.error(f"Failed to render diagram: {e}")
-            st.code(diagram_code, language="mermaid")uthentication with Azure OpenAI using DefaultAzureCredential
 - Token counting and management for input and output messages
-- Streaming chat completions with proper error handling
+- Streaming chat completions with proper error handling via LangGraph workflows
 - Loading and formatting system prompts from files
 - XML tag detection and handling for document embedding
 
@@ -33,14 +20,13 @@ Environment Variables:
 
 
 Dependencies:
-- openai: Main client for interacting with OpenAI API
-- azure.identity: For authentication with Azure
+- agents.agent: Now uses LangGraph-powered Agent class
 - streamlit: For UI components and session management
 - tiktoken: For token counting
 """
 
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, Any
 
 import streamlit as st
 import tiktoken
@@ -49,7 +35,9 @@ from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
 
-from agents.agent import Agent
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from agents.agent import Agent
 
 # Configure logging using Streamlit's logger
 logger = get_logger(__name__)
@@ -97,18 +85,46 @@ def count_xml_tags(text: str) -> int:
 
 
 def handle_chat_prompt(
-    prompt: str, messages: List[Dict[str, str]], agent: Agent
+    prompt: str, 
+    page_or_messages: Union[Dict[str, any], List[Dict[str, str]]], 
+    model_or_agent: Union[str, "Agent"],
+    temperature: Optional[float] = None
 ) -> None:
-    """Process a user prompt, send to Azure OpenAI and display the response.
+    """Process a user prompt, send to Azure OpenAI via LangGraph and display the response.
+
+    MIGRATION NOTE: This function now supports both the old interface (page, model) and 
+    new interface (messages, agent) for backward compatibility. When using the old interface,
+    it creates a temporary agent internally.
 
     Args:
         prompt: The user's text input
-        page: Dictionary containing page state including messages history
-        agent: Agent instance to use for chat completion
+        page_or_messages: Either a page dict (old interface) or messages list (new interface)
+        model_or_agent: Either a model string (old interface) or Agent instance (new interface)
+        temperature: Temperature setting (only used with old interface)
 
     Returns:
         None - updates the session state and UI directly
     """
+    # Determine which interface is being used
+    if isinstance(model_or_agent, str):
+        # Old interface: page dict and model string
+        page = page_or_messages
+        model = model_or_agent
+        messages = page["messages"]
+        
+        # Create a temporary agent for this call
+        from agents.single_agent import SingleAgent
+        temp_agent = SingleAgent(
+            agent_key=f"temp_{model}",
+            persona="prompts/facilitator_persona.md",  # Default persona
+            model=model,
+            temperature=temperature or 0.7
+        )
+        agent = temp_agent
+    else:
+        # New interface: messages list and agent instance
+        messages = page_or_messages
+        agent = model_or_agent
     # Cleanup prompt
     if count_xml_tags(prompt) > 0:
         logger.debug("Prompt contains XML tags.")
