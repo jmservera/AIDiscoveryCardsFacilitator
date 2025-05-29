@@ -88,7 +88,7 @@ def handle_chat_prompt(
     messages: List[Dict[str, str]], 
     agent: "Agent"
 ) -> None:
-    """Process a user prompt, send to Azure OpenAI via LangGraph and display the response.
+    """Process a user prompt, send to Azure OpenAI via async LangGraph and display the response.
 
     Args:
         prompt: The user's text input
@@ -98,35 +98,27 @@ def handle_chat_prompt(
     Returns:
         None - updates the session state and UI directly
     """
-    # Cleanup prompt
-    if count_xml_tags(prompt) > 0:
-        logger.debug("Prompt contains XML tags.")
-        # embed documents to avoid harm
-        prompt = f"<documents>{prompt}</documents>"
-
-    # Echo the user's prompt to the chat window
-    messages.append({"role": "user", "content": prompt})
-    logger.debug("Writing user prompt to chat")
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Calculate tokens in the input
-    input_tokens = count_tokens(messages)
-    logger.debug("Input tokens: %d", input_tokens)
-    # Send the user's prompt to Azure OpenAI via LangGraph and display the response
-    with st.chat_message("assistant"):
+    import asyncio
+    
+    async def async_handle_chat_prompt():
+        """Async implementation of chat prompt handling."""
+        # Calculate tokens in the input
+        input_tokens = count_tokens(messages)
+        logger.debug("Input tokens: %d", input_tokens)
+        
+        # Send the user's prompt to Azure OpenAI via async LangGraph and display the response
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
         full_response = ""
         final_chunk = None
         try:
             logger.debug(
-                "Creating chat completion using agent %s with model %s and temperature %s",
+                "Creating async chat completion using agent %s with model %s and temperature %s",
                 agent.agent_key,
                 agent.model,
                 agent.temperature,
             )
-            for chunk in agent.create_chat_completion(messages):
+            async for chunk in agent.create_chat_completion(messages):
                 # Process LangChain streaming chunks
                 if hasattr(chunk, 'content') and chunk.content:
                     # Regular streaming chunk with content
@@ -138,7 +130,7 @@ def handle_chat_prompt(
                 else:
                     logger.warning("Received unexpected chunk format: %s", chunk)
         except Exception as e:
-            logger.exception("Error during chat completion: %s", e)
+            logger.exception("Error during async chat completion: %s", e)
             full_response += "An error happened, retry your request.\n"
         finally:
             # Ensure we always clear the placeholder even if an error occurs
@@ -151,6 +143,25 @@ def handle_chat_prompt(
 
         # Render the response text with potential Mermaid diagrams
         render_message(full_response)
+        
+        return full_response, final_chunk
+
+    # Cleanup prompt
+    if count_xml_tags(prompt) > 0:
+        logger.debug("Prompt contains XML tags.")
+        # embed documents to avoid harm
+        prompt = f"<documents>{prompt}</documents>"
+
+    # Echo the user's prompt to the chat window
+    messages.append({"role": "user", "content": prompt})
+    logger.debug("Writing user prompt to chat")
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Execute the async chat handling within the assistant context
+    with st.chat_message("assistant"):
+        # Run the async function using asyncio.run to handle the async agent method
+        full_response, final_chunk = asyncio.run(async_handle_chat_prompt())
 
     # Add the response to the messages
     messages.append({"role": "assistant", "content": full_response})
@@ -159,6 +170,7 @@ def handle_chat_prompt(
     if final_chunk and hasattr(final_chunk, 'usage_info'):
         copy_button(full_response, key=full_response)
         usage = final_chunk.usage_info
+        input_tokens = count_tokens(messages[:-1])  # Calculate input tokens again for final display
         st.caption(
             f"""Token usage for this interaction:
         - Input tokens: {input_tokens}

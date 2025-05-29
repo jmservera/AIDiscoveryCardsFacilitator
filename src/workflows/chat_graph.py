@@ -150,32 +150,6 @@ class ChatGraph:
         # Return the updated state
         return {"messages": [response]}
 
-    def stream_chat_completion(self, messages: List[Dict[str, str]]) -> AsyncIterator[Dict[str, Any]]:
-        """
-        Stream chat completion using LangGraph workflow.
-
-        Parameters:
-        -----------
-        messages : List[Dict[str, str]]
-            List of message dictionaries with 'role' and 'content' keys.
-
-        Yields:
-        -------
-        Dict[str, Any]
-            Streaming response chunks compatible with OpenAI format.
-        """
-        # Convert message dictionaries to LangChain format
-        langchain_messages = self._convert_to_langchain_messages(messages)
-        
-        # Create initial state
-        initial_state = {"messages": langchain_messages}
-        
-        # Get the graph
-        graph = self._create_graph()
-        
-        # Stream the workflow execution
-        return graph.astream(initial_state)
-
     def _convert_to_langchain_messages(self, messages: List[Dict[str, str]]) -> List[BaseMessage]:
         """
         Convert message dictionaries to LangChain message format.
@@ -209,95 +183,60 @@ class ChatGraph:
                 
         return langchain_messages
 
-    def create_chat_completion_sync(self, messages: List[Dict[str, str]]) -> Any:
+    async def create_chat_completion_async(self, messages: List[Dict[str, str]]) -> AsyncIterator[Any]:
         """
-        Synchronous wrapper for chat completion to maintain compatibility.
+        Create async chat completion with streaming support.
         
-        This method provides a synchronous interface that mimics the original
-        openai.Stream behavior for backward compatibility with existing code.
+        This method provides a direct async interface for chat completion,
+        replacing the synchronous wrapper approach.
 
         Parameters:
         -----------
         messages : List[Dict[str, str]]
             List of message dictionaries with 'role' and 'content' keys.
 
-        Returns:
-        --------
+        Yields:
+        -------
         Any
-            A generator that yields streaming response chunks.
+            Streaming response chunks compatible with LangChain format.
         """
-        import asyncio
-        
-        def sync_stream_generator():
-            try:
-                # Convert message dictionaries to LangChain format
-                langchain_messages = self._convert_to_langchain_messages(messages)
-                
-                # Get the LLM for streaming
-                llm = self._get_azure_chat_openai()
-                
-                # Check if we're already in an event loop
-                try:
-                    loop = asyncio.get_running_loop()
-                    is_running = True
-                except RuntimeError:
-                    loop = None
-                    is_running = False
-                
-                if is_running:
-                    # We're in an async context, use fallback
-                    yield from self._create_fallback_response(messages)
-                else:
-                    # Create new event loop for async operations
-                    async def async_stream():
-                        full_content = ""
-                        async for chunk in llm.astream(langchain_messages):
-                            content = chunk.content if hasattr(chunk, 'content') and chunk.content else ""
-                            if content:
-                                full_content += content
-                                yield chunk
-                        
-                        # Yield final chunk with usage info - create a simple object with usage
-                        class FinalChunk:
-                            def __init__(self, content: str):
-                                self.content = ""
-                                # Rough estimation of tokens for usage display
-                                self.usage_info = {
-                                    'completion_tokens': len(content.split()) if content else 0,
-                                    'prompt_tokens': 50,  # Estimate
-                                    'total_tokens': len(content.split()) + 50 if content else 50
-                                }
-                        
-                        yield FinalChunk(full_content)
-                    
-                    # Run async generator in new event loop
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    
-                    try:
-                        async_gen = async_stream()
-                        while True:
-                            try:
-                                chunk = new_loop.run_until_complete(async_gen.__anext__())
-                                yield chunk
-                            except StopAsyncIteration:
-                                break
-                    finally:
-                        new_loop.close()
-                        
-            except Exception as e:
-                logger.warning(f"LangGraph execution failed, using fallback response: {e}")
-                # Fallback to mock response when Azure authentication fails
-                yield from self._create_fallback_response(messages)
-                    
-        return sync_stream_generator()
+        try:
+            # Convert message dictionaries to LangChain format
+            langchain_messages = self._convert_to_langchain_messages(messages)
+            
+            # Get the LLM for streaming
+            llm = self._get_azure_chat_openai()
+            
+            full_content = ""
+            async for chunk in llm.astream(langchain_messages):
+                content = chunk.content if hasattr(chunk, 'content') and chunk.content else ""
+                if content:
+                    full_content += content
+                    yield chunk
+            
+            # Yield final chunk with usage info
+            class FinalChunk:
+                def __init__(self, content: str):
+                    self.content = ""
+                    # Rough estimation of tokens for usage display
+                    self.usage_info = {
+                        'completion_tokens': len(content.split()) if content else 0,
+                        'prompt_tokens': 50,  # Estimate
+                        'total_tokens': len(content.split()) + 50 if content else 50
+                    }
+            
+            yield FinalChunk(full_content)
+            
+        except Exception as e:
+            logger.warning(f"LangGraph execution failed, using fallback response: {e}")
+            # Fallback to mock response when Azure authentication fails
+            async for chunk in self._create_async_fallback_response(messages):
+                yield chunk
 
-    def _create_fallback_response(self, messages: List[Dict[str, str]]) -> Any:
+    async def _create_async_fallback_response(self, messages: List[Dict[str, str]]) -> AsyncIterator[Any]:
         """
-        Create a fallback response when LangGraph execution fails.
+        Create an async fallback response when LangGraph execution fails.
         
-        This is useful for testing and when Azure credentials are not available.
-
         Parameters:
         -----------
         messages : List[Dict[str, str]]
@@ -308,19 +247,19 @@ class ChatGraph:
         Any
             Mock streaming response chunks.
         """
-        import time
+        import asyncio
         
         # Create a meaningful fallback response
-        fallback_content = "Hello! I'm now using LangGraph workflows for chat completion. This is a fallback response since Azure OpenAI credentials are not available in this environment."
+        fallback_content = "Hello! I'm now using async LangGraph workflows for chat completion. This is a fallback response since Azure OpenAI credentials are not available in this environment."
         
         # Get last user message for more context
         user_messages = [m for m in messages if m.get('role') == 'user']
         if user_messages:
             last_user_msg = user_messages[-1].get('content', '')
             if 'hello' in last_user_msg.lower():
-                fallback_content = "Hello! How can I help you today? I'm now running on LangGraph workflows!"
+                fallback_content = "Hello! How can I help you today? I'm now running on async LangGraph workflows!"
             elif 'test' in last_user_msg.lower():
-                fallback_content = "This is a test response from the new LangGraph-powered agent!"
+                fallback_content = "This is a test response from the new async LangGraph-powered agent!"
         
         words = fallback_content.split()
         
@@ -333,7 +272,7 @@ class ChatGraph:
                     self.content = content
             
             yield MockChunk(partial_content)
-            time.sleep(0.05)  # Simulate streaming delay
+            await asyncio.sleep(0.05)  # Simulate streaming delay
         
         # Final response with usage info
         class FinalChunk:

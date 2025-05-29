@@ -26,7 +26,7 @@ Dependencies:
 """
 
 import os
-from typing import Any, Dict, Iterable, List
+from typing import Any, AsyncIterator, Dict, Iterable, List
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -109,26 +109,25 @@ class Agent:
         # Ensure the messages have the correct structure for LangGraph
         return [{"role": m["role"], "content": m["content"]} for m in messages]
 
-    def create_chat_completion(self, messages: List[Dict[str, str]]) -> Any:
+    async def create_chat_completion(self, messages: List[Dict[str, str]]) -> AsyncIterator[Any]:
         """
-        Create and return a new chat completion request using LangGraph workflow.
+        Create and return a new chat completion request using async LangGraph workflow.
 
-        MIGRATION NOTE: This method now uses LangGraph workflows instead of 
-        direct Azure OpenAI API calls, but maintains the same interface for
-        backward compatibility.
+        MIGRATION NOTE: This method now uses async LangGraph workflows instead of 
+        synchronous wrappers, providing direct async behavior compatible with Streamlit.
 
         Parameters:
         -----------
         messages : List[Dict[str, str]]
             List of message objects with role and content.
 
-        Returns:
-        --------
-        Any
-            A streaming response compatible with the original OpenAI format.
+        Yields:
+        -------
+        AsyncIterator[Any]
+            An async streaming response compatible with LangChain format.
         """
         logger.debug(
-            "Creating LangGraph chat completion for %d messages with model %s",
+            "Creating async LangGraph chat completion for %d messages with model %s",
             len(messages),
             self.model,
         )
@@ -136,5 +135,6 @@ class Agent:
         # Format messages for LangGraph workflow
         formatted_messages = self.format_messages(messages)
         
-        # Use LangGraph workflow for chat completion
-        return self._chat_graph.create_chat_completion_sync(formatted_messages)
+        # Use async LangGraph workflow for chat completion
+        async for chunk in self._chat_graph.create_chat_completion_async(formatted_messages):
+            yield chunk
