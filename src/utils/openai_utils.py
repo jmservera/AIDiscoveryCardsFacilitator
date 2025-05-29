@@ -99,7 +99,6 @@ def handle_chat_prompt(
     Returns:
         None - updates the session state and UI directly
     """
-    agent_instance = agent
     # Cleanup prompt
     if count_xml_tags(prompt) > 0:
         logger.debug("Prompt contains XML tags.")
