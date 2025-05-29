@@ -48,7 +48,6 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-pre
 
 class ChatState(TypedDict):
     """State definition for the chat workflow."""
-
     messages: Annotated[List[BaseMessage], add_messages]
 
 
