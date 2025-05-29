@@ -65,3 +65,7 @@ The diagram above shows a simple decision flow.
 
 The application will detect the Mermaid code blocks and render them as interactive diagrams while preserving the rest of the response's markdown formatting.
 
+### Future
+
+Async behavior
+
