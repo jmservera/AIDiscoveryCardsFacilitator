@@ -5,9 +5,9 @@ This module provides a set of utilities to authenticate, communicate with, and p
 responses from Azure OpenAI services. It handles token management, message formatting,
 and streaming chat completions.
 
-MIGRATION NOTE: This module has been updated to work with LangGraph-based chat workflows.
-The Agent classes now use LangGraph and LangChain's AzureChatOpenAI instead of direct 
-openai.AzureOpenAI client usage. The interface remains the same for backward compatibility.
+This module has been updated to work with LangGraph-based chat workflows.
+The Agent classes use LangGraph and LangChain's AzureChatOpenAI instead of direct 
+openai.AzureOpenAI client usage.
 
 Key Features:
 - Token counting and management for input and output messages
@@ -20,7 +20,7 @@ Environment Variables:
 
 
 Dependencies:
-- agents.agent: Now uses LangGraph-powered Agent class
+- agents.agent: Uses LangGraph-powered Agent class
 - streamlit: For UI components and session management
 - tiktoken: For token counting
 """
@@ -86,53 +86,20 @@ def count_xml_tags(text: str) -> int:
 
 def handle_chat_prompt(
     prompt: str, 
-    page_or_messages: Union[Dict[str, any], List[Dict[str, str]]], 
-    model_or_agent: Union[str, "Agent", None] = None,
-    temperature: Optional[float] = None,
-    agent: Optional["Agent"] = None
+    messages: List[Dict[str, str]], 
+    agent: "Agent"
 ) -> None:
     """Process a user prompt, send to Azure OpenAI via LangGraph and display the response.
 
-    MIGRATION NOTE: This function now supports both the old interface (page, model) and 
-    new interface (messages, agent) for backward compatibility. When using the old interface,
-    it creates a temporary agent internally.
-
     Args:
         prompt: The user's text input
-        page_or_messages: Either a page dict (old interface) or messages list (new interface)
-        model_or_agent: Either a model string (old interface) or Agent instance (new interface), or None
-        temperature: Temperature setting (only used with old interface)
-        agent: Agent instance (new keyword interface)
+        messages: List of chat messages
+        agent: Agent instance to handle the conversation
 
     Returns:
         None - updates the session state and UI directly
     """
-    # Determine which interface is being used
-    if agent is not None:
-        # New keyword interface: agent passed as keyword argument
-        messages = page_or_messages
-        agent_instance = agent
-    elif isinstance(model_or_agent, str):
-        # Old interface: page dict and model string
-        page = page_or_messages
-        model = model_or_agent
-        messages = page["messages"]
-        
-        # Create a temporary agent for this call
-        from agents.single_agent import SingleAgent
-        temp_agent = SingleAgent(
-            agent_key=f"temp_{model}",
-            persona="prompts/facilitator_persona.md",  # Default persona
-            model=model,
-            temperature=temperature or 0.7
-        )
-        agent_instance = temp_agent
-    elif model_or_agent is not None:
-        # New interface: messages list and agent instance as positional argument
-        messages = page_or_messages
-        agent_instance = model_or_agent
-    else:
-        raise ValueError("Either model_or_agent must be provided or agent keyword argument must be used")
+    agent_instance = agent
     # Cleanup prompt
     if count_xml_tags(prompt) > 0:
         logger.debug("Prompt contains XML tags.")
