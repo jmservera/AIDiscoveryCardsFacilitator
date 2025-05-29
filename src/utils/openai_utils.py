@@ -160,8 +160,27 @@ def handle_chat_prompt(
 
     # Execute the async chat handling within the assistant context
     with st.chat_message("assistant"):
-        # Run the async function using asyncio.run to handle the async agent method
-        full_response, final_chunk = asyncio.run(async_handle_chat_prompt())
+        try:
+            # Try to run the async function directly
+            # In most Streamlit contexts, this should work fine
+            full_response, final_chunk = asyncio.run(async_handle_chat_prompt())
+        except RuntimeError as e:
+            if "cannot be called from a running event loop" in str(e):
+                logger.warning("Already in event loop, using fallback synchronous handling")
+                # If we're already in an event loop, fall back to a simpler approach
+                # This should be rare in normal Streamlit usage
+                message_placeholder = st.empty()
+                message_placeholder.markdown("*Generating response...*")
+                
+                # Simple fallback response
+                full_response = "The async agent is temporarily unavailable. Please try again."
+                final_chunk = None
+                
+                message_placeholder.empty()
+                render_message(full_response)
+            else:
+                # Re-raise other RuntimeErrors
+                raise
 
     # Add the response to the messages
     messages.append({"role": "assistant", "content": full_response})
