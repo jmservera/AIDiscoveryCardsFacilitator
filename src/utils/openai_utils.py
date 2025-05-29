@@ -3,28 +3,15 @@ Utility functions for interacting with Azure OpenAI API
 
 This module provides a set of utilities to authenticate, communicate with, and process
 responses from Azure OpenAI services. It handles token management, message formatting,
-and streaming chat completions using Azure OpenAI's API.
+and streaming chat completions.
+
+This module has been updated to work with LangGraph-based chat workflows.
+The Agent classes use LangGraph and LangChain's AzureChatOpenAI instead of direct 
+openai.AzureOpenAI client usage.
 
 Key Features:
-        # Display the mermaid diagram
-        try:
-            # Set a more appropriate height based on number of lines in the diagram
-            # with a minimum height to ensure diagrams are properly displayed
-            line_count = diagram_code.count('\n') + 1
-            node_count = diagram_code.count('[') + diagram_code.count('{') + diagram_code.count('(')
-
-            # Adjust height based on complexity: more lines = more height
-            height = max(line_count * 30, node_count * 70, 400)  # Minimum 400px height
-
-            # Use container width (which adapts to the page width)
-            # Render the mermaid diagram with adjusted dimensions
-            st_mermaid(diagram_code, height=height, width="container")
-        except Exception as e:
-            logger.exception("Error rendering mermaid diagram: %s", e)
-            st.error(f"Failed to render diagram: {e}")
-            st.code(diagram_code, language="mermaid")uthentication with Azure OpenAI using DefaultAzureCredential
 - Token counting and management for input and output messages
-- Streaming chat completions with proper error handling
+- Streaming chat completions with proper error handling via LangGraph workflows
 - Loading and formatting system prompts from files
 - XML tag detection and handling for document embedding
 
@@ -33,23 +20,23 @@ Environment Variables:
 
 
 Dependencies:
-- openai: Main client for interacting with OpenAI API
-- azure.identity: For authentication with Azure
+- agents.agent: Uses LangGraph-powered Agent class
 - streamlit: For UI components and session management
 - tiktoken: For token counting
 """
 
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, Any
 
 import streamlit as st
 import tiktoken
-from openai.types.chat import ChatCompletionChunk
 from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
 
-from agents.agent import Agent
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from agents.agent import Agent
 
 # Configure logging using Streamlit's logger
 logger = get_logger(__name__)
@@ -97,14 +84,16 @@ def count_xml_tags(text: str) -> int:
 
 
 def handle_chat_prompt(
-    prompt: str, messages: List[Dict[str, str]], agent: Agent
+    prompt: str, 
+    messages: List[Dict[str, str]], 
+    agent: "Agent"
 ) -> None:
-    """Process a user prompt, send to Azure OpenAI and display the response.
+    """Process a user prompt, send to Azure OpenAI via LangGraph and display the response.
 
     Args:
         prompt: The user's text input
-        page: Dictionary containing page state including messages history
-        agent: Agent instance to use for chat completion
+        messages: List of chat messages
+        agent: Agent instance to handle the conversation
 
     Returns:
         None - updates the session state and UI directly
@@ -124,12 +113,12 @@ def handle_chat_prompt(
     # Calculate tokens in the input
     input_tokens = count_tokens(messages)
     logger.debug("Input tokens: %d", input_tokens)
-    # Send the user's prompt to Azure OpenAI and display the response
+    # Send the user's prompt to Azure OpenAI via LangGraph and display the response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
         full_response = ""
-        completion: Optional[ChatCompletionChunk] = None
+        final_chunk = None
         try:
             logger.debug(
                 "Creating chat completion using agent %s with model %s and temperature %s",
@@ -137,24 +126,20 @@ def handle_chat_prompt(
                 agent.model,
                 agent.temperature,
             )
-            response: ChatCompletionChunk
-            for response in agent.create_chat_completion(messages):
-                if response.choices:
-                    try:
-                        if response.choices[0].delta is not None:
-                            full_response += response.choices[0].delta.content or ""
-                            message_placeholder.markdown(full_response + "▌")
-                        else:
-                            logger.debug(response.choices[0].model_dump_json())
-                    except (AttributeError, IndexError) as e:
-                        logger.exception("Error processing response: %s", e)
-                        full_response += "An error happened, retry your request.\n"
-                elif not response.usage:
-                    logger.warning(
-                        "Received empty response from OpenAI API. %s",
-                        response,
-                    )
-                completion = response
+            for chunk in agent.create_chat_completion(messages):
+                # Process LangChain streaming chunks
+                if hasattr(chunk, 'content') and chunk.content:
+                    # Regular streaming chunk with content
+                    full_response += chunk.content
+                    message_placeholder.markdown(full_response + "▌")
+                elif hasattr(chunk, 'usage_info'):
+                    # Final chunk with usage information
+                    final_chunk = chunk
+                else:
+                    logger.warning("Received unexpected chunk format: %s", chunk)
+        except Exception as e:
+            logger.exception("Error during chat completion: %s", e)
+            full_response += "An error happened, retry your request.\n"
         finally:
             # Ensure we always clear the placeholder even if an error occurs
             if not full_response:
@@ -171,13 +156,14 @@ def handle_chat_prompt(
     messages.append({"role": "assistant", "content": full_response})
 
     # Display token usage
-    if completion and completion.usage:
+    if final_chunk and hasattr(final_chunk, 'usage_info'):
         copy_button(full_response, key=full_response)
+        usage = final_chunk.usage_info
         st.caption(
             f"""Token usage for this interaction:
         - Input tokens: {input_tokens}
-        - Output tokens: {completion.usage.completion_tokens}
-        - Total tokens: {completion.usage.total_tokens}"""
+        - Output tokens: {usage['completion_tokens']}
+        - Total tokens: {usage['total_tokens']}"""
         )
 
 
