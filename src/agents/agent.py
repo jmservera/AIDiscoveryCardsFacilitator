@@ -2,18 +2,18 @@
 agent.py
 
 This module defines the base Agent class for implementing conversational agents
-that interact with Azure OpenAI services via LangGraph workflows. This replaces 
-direct Azure OpenAI API calls with LangGraph-based chat workflows while maintaining 
+that interact with Azure OpenAI services via LangGraph workflows. This replaces
+direct Azure OpenAI API calls with LangGraph-based chat workflows while maintaining
 backward compatibility.
 
-MIGRATION NOTE: This module has been refactored to use LangGraph and LangChain's 
-AzureChatOpenAI instead of direct openai.AzureOpenAI client usage. The interface 
+MIGRATION NOTE: This module has been refactored to use LangGraph and LangChain's
+AzureChatOpenAI instead of direct openai.AzureOpenAI client usage. The interface
 remains the same for backward compatibility with existing code.
 
 Classes:
 ---------
 Agent
-    Base class for agent implementations, now using LangGraph workflows for 
+    Base class for agent implementations, now using LangGraph workflows for
     chat completion instead of direct Azure OpenAI API calls.
 
 Dependencies:
@@ -26,7 +26,7 @@ Dependencies:
 """
 
 import os
-from typing import Any, Dict, Iterable, List
+from typing import Any, AsyncIterator, Dict, Iterable, List
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -44,7 +44,7 @@ class Agent:
     """
     Base class for agent implementations using LangGraph workflows.
 
-    MIGRATION NOTE: This class now uses LangGraph and LangChain's AzureChatOpenAI 
+    MIGRATION NOTE: This class now uses LangGraph and LangChain's AzureChatOpenAI
     for interacting with Azure OpenAI, replacing direct openai.AzureOpenAI client usage.
     The interface remains the same for backward compatibility.
 
@@ -90,51 +90,30 @@ class Agent:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    @staticmethod
-    def format_messages(
-        messages: List[Dict[str, Any]],
-    ) -> List[Dict[str, str]]:
+    def create_chat_completion_async(
+        self, messages: List[Dict[str, str]]
+    ) -> AsyncIterator[Any]:
         """
-        Format messages to be compatible with the chat workflow.
+        Create and return a new chat completion request using async LangGraph workflow.
 
-        MIGRATION NOTE: This method now returns a list of dictionaries instead of 
-        ChatCompletionMessageParam to work with LangGraph workflows.
-
-        Args:
-            messages: A list of message dictionaries with 'role' and 'content' keys
-
-        Returns:
-            A list of properly formatted messages compatible with LangGraph workflows
-        """
-        # Ensure the messages have the correct structure for LangGraph
-        return [{"role": m["role"], "content": m["content"]} for m in messages]
-
-    def create_chat_completion(self, messages: List[Dict[str, str]]) -> Any:
-        """
-        Create and return a new chat completion request using LangGraph workflow.
-
-        MIGRATION NOTE: This method now uses LangGraph workflows instead of 
-        direct Azure OpenAI API calls, but maintains the same interface for
-        backward compatibility.
+        MIGRATION NOTE: This method now uses async LangGraph workflows instead of
+        synchronous wrappers, providing direct async behavior compatible with Streamlit.
 
         Parameters:
         -----------
         messages : List[Dict[str, str]]
             List of message objects with role and content.
 
-        Returns:
-        --------
-        Any
-            A streaming response compatible with the original OpenAI format.
+        Yields:
+        -------
+        AsyncIterator[Any]
+            An async streaming response compatible with LangChain format.
         """
         logger.debug(
-            "Creating LangGraph chat completion for %d messages with model %s",
+            "Creating async LangGraph chat completion for %d messages with model %s",
             len(messages),
             self.model,
         )
-        
-        # Format messages for LangGraph workflow
-        formatted_messages = self.format_messages(messages)
-        
-        # Use LangGraph workflow for chat completion
-        return self._chat_graph.create_chat_completion_sync(formatted_messages)
+
+        # Use async LangGraph workflow for chat completion
+        return self._chat_graph.create_chat_completion_async(messages)
