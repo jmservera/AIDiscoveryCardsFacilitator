@@ -255,11 +255,20 @@ class ChatGraph:
                             content = chunk.content if hasattr(chunk, 'content') and chunk.content else ""
                             if content:
                                 full_content += content
-                                yield self._convert_langchain_chunk_to_openai_format(chunk)
+                                yield chunk
                         
-                        # Yield final chunk with usage info
-                        final_chunk = self._create_mock_response(full_content, include_usage=True)
-                        yield final_chunk
+                        # Yield final chunk with usage info - create a simple object with usage
+                        class FinalChunk:
+                            def __init__(self, content: str):
+                                self.content = ""
+                                # Rough estimation of tokens for usage display
+                                self.usage_info = {
+                                    'completion_tokens': len(content.split()) if content else 0,
+                                    'prompt_tokens': 50,  # Estimate
+                                    'total_tokens': len(content.split()) + 50 if content else 50
+                                }
+                        
+                        yield FinalChunk(full_content)
                     
                     # Run async generator in new event loop
                     new_loop = asyncio.new_event_loop()
@@ -318,88 +327,23 @@ class ChatGraph:
         # Stream the response word by word to simulate real streaming
         for i, word in enumerate(words):
             partial_content = " ".join(words[:i+1])
-            yield self._create_mock_response(partial_content)
+            # Create a simple LangChain-style chunk
+            class MockChunk:
+                def __init__(self, content: str):
+                    self.content = content
+            
+            yield MockChunk(partial_content)
             time.sleep(0.05)  # Simulate streaming delay
         
-        # Final response with usage
-        final_response = self._create_mock_response(fallback_content, include_usage=True)
-        yield final_response
-
-    def _create_mock_response(self, content: str, include_usage: bool = False) -> Any:
-        """
-        Create a mock OpenAI-style response for testing and compatibility.
-
-        Parameters:
-        -----------
-        content : str
-            The content for the response.
-        include_usage : bool, optional
-            Whether to include usage information. Defaults to False.
-
-        Returns:
-        --------
-        Any
-            Mock OpenAI-compatible response object.
-        """
-        class MockChoice:
-            def __init__(self, content: str = ""):
-                self.delta = MockDelta(content)
-
-        class MockDelta:
-            def __init__(self, content: str = ""):
-                self.content = content
-
-        class MockUsage:
-            def __init__(self):
-                # Rough estimation of tokens
-                self.completion_tokens = len(content.split()) if content else 0
-                self.prompt_tokens = 50  # Estimate
-                self.total_tokens = self.completion_tokens + self.prompt_tokens
-
-        class MockResponse:
-            def __init__(self, content: str = "", include_usage: bool = False):
-                self.choices = [MockChoice(content)]
-                self.usage = MockUsage() if include_usage else None
-
-        return MockResponse(content, include_usage)
-
-    def _convert_langchain_chunk_to_openai_format(self, chunk: Any) -> Any:
-        """
-        Convert LangChain streaming chunk to OpenAI-compatible format.
-
-        Parameters:
-        -----------
-        chunk : Any
-            LangChain streaming chunk.
-
-        Returns:
-        --------
-        Any
-            OpenAI-compatible streaming chunk.
-        """
-        # Create a mock OpenAI-style response chunk
-        class MockChoice:
-            def __init__(self, content: str = ""):
-                self.delta = MockDelta(content)
-
-        class MockDelta:
-            def __init__(self, content: str = ""):
-                self.content = content
-
-        class MockUsage:
-            def __init__(self):
-                self.completion_tokens = 0
-                self.prompt_tokens = 0
-                self.total_tokens = 0
-
-        class MockResponse:
-            def __init__(self, content: str = ""):
-                self.choices = [MockChoice(content)]
-                self.usage = MockUsage()
-
-        # Extract content from the LangChain chunk
-        content = ""
-        if hasattr(chunk, 'content'):
-            content = chunk.content or ""
+        # Final response with usage info
+        class FinalChunk:
+            def __init__(self, content: str):
+                self.content = ""
+                self.usage_info = {
+                    'completion_tokens': len(content.split()) if content else 0,
+                    'prompt_tokens': 50,  # Estimate
+                    'total_tokens': len(content.split()) + 50 if content else 50
+                }
         
-        return MockResponse(content)
+        yield FinalChunk(fallback_content)
+

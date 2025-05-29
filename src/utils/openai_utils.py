@@ -30,7 +30,6 @@ from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, Any
 
 import streamlit as st
 import tiktoken
-from openai.types.chat import ChatCompletionChunk
 from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
@@ -114,37 +113,33 @@ def handle_chat_prompt(
     # Calculate tokens in the input
     input_tokens = count_tokens(messages)
     logger.debug("Input tokens: %d", input_tokens)
-    # Send the user's prompt to Azure OpenAI and display the response
+    # Send the user's prompt to Azure OpenAI via LangGraph and display the response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
         full_response = ""
-        completion: Optional[ChatCompletionChunk] = None
+        final_chunk = None
         try:
             logger.debug(
                 "Creating chat completion using agent %s with model %s and temperature %s",
-                agent_instance.agent_key,
-                agent_instance.model,
-                agent_instance.temperature,
+                agent.agent_key,
+                agent.model,
+                agent.temperature,
             )
-            response: ChatCompletionChunk
-            for response in agent_instance.create_chat_completion(messages):
-                if response.choices:
-                    try:
-                        if response.choices[0].delta is not None:
-                            full_response += response.choices[0].delta.content or ""
-                            message_placeholder.markdown(full_response + "▌")
-                        else:
-                            logger.debug(response.choices[0].model_dump_json())
-                    except (AttributeError, IndexError) as e:
-                        logger.exception("Error processing response: %s", e)
-                        full_response += "An error happened, retry your request.\n"
-                elif not response.usage:
-                    logger.warning(
-                        "Received empty response from OpenAI API. %s",
-                        response,
-                    )
-                completion = response
+            for chunk in agent.create_chat_completion(messages):
+                # Process LangChain streaming chunks
+                if hasattr(chunk, 'content') and chunk.content:
+                    # Regular streaming chunk with content
+                    full_response += chunk.content
+                    message_placeholder.markdown(full_response + "▌")
+                elif hasattr(chunk, 'usage_info'):
+                    # Final chunk with usage information
+                    final_chunk = chunk
+                else:
+                    logger.warning("Received unexpected chunk format: %s", chunk)
+        except Exception as e:
+            logger.exception("Error during chat completion: %s", e)
+            full_response += "An error happened, retry your request.\n"
         finally:
             # Ensure we always clear the placeholder even if an error occurs
             if not full_response:
@@ -161,13 +156,14 @@ def handle_chat_prompt(
     messages.append({"role": "assistant", "content": full_response})
 
     # Display token usage
-    if completion and completion.usage:
+    if final_chunk and hasattr(final_chunk, 'usage_info'):
         copy_button(full_response, key=full_response)
+        usage = final_chunk.usage_info
         st.caption(
             f"""Token usage for this interaction:
         - Input tokens: {input_tokens}
-        - Output tokens: {completion.usage.completion_tokens}
-        - Total tokens: {completion.usage.total_tokens}"""
+        - Output tokens: {usage['completion_tokens']}
+        - Total tokens: {usage['total_tokens']}"""
         )
 
 
