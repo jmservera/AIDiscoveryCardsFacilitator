@@ -87,8 +87,9 @@ def count_xml_tags(text: str) -> int:
 def handle_chat_prompt(
     prompt: str, 
     page_or_messages: Union[Dict[str, any], List[Dict[str, str]]], 
-    model_or_agent: Union[str, "Agent"],
-    temperature: Optional[float] = None
+    model_or_agent: Union[str, "Agent", None] = None,
+    temperature: Optional[float] = None,
+    agent: Optional["Agent"] = None
 ) -> None:
     """Process a user prompt, send to Azure OpenAI via LangGraph and display the response.
 
@@ -99,14 +100,19 @@ def handle_chat_prompt(
     Args:
         prompt: The user's text input
         page_or_messages: Either a page dict (old interface) or messages list (new interface)
-        model_or_agent: Either a model string (old interface) or Agent instance (new interface)
+        model_or_agent: Either a model string (old interface) or Agent instance (new interface), or None
         temperature: Temperature setting (only used with old interface)
+        agent: Agent instance (new keyword interface)
 
     Returns:
         None - updates the session state and UI directly
     """
     # Determine which interface is being used
-    if isinstance(model_or_agent, str):
+    if agent is not None:
+        # New keyword interface: agent passed as keyword argument
+        messages = page_or_messages
+        agent_instance = agent
+    elif isinstance(model_or_agent, str):
         # Old interface: page dict and model string
         page = page_or_messages
         model = model_or_agent
@@ -120,11 +126,13 @@ def handle_chat_prompt(
             model=model,
             temperature=temperature or 0.7
         )
-        agent = temp_agent
-    else:
-        # New interface: messages list and agent instance
+        agent_instance = temp_agent
+    elif model_or_agent is not None:
+        # New interface: messages list and agent instance as positional argument
         messages = page_or_messages
-        agent = model_or_agent
+        agent_instance = model_or_agent
+    else:
+        raise ValueError("Either model_or_agent must be provided or agent keyword argument must be used")
     # Cleanup prompt
     if count_xml_tags(prompt) > 0:
         logger.debug("Prompt contains XML tags.")
@@ -149,12 +157,12 @@ def handle_chat_prompt(
         try:
             logger.debug(
                 "Creating chat completion using agent %s with model %s and temperature %s",
-                agent.agent_key,
-                agent.model,
-                agent.temperature,
+                agent_instance.agent_key,
+                agent_instance.model,
+                agent_instance.temperature,
             )
             response: ChatCompletionChunk
-            for response in agent.create_chat_completion(messages):
+            for response in agent_instance.create_chat_completion(messages):
                 if response.choices:
                     try:
                         if response.choices[0].delta is not None:
