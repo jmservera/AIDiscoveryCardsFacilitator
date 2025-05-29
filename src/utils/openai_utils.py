@@ -6,7 +6,7 @@ responses from Azure OpenAI services. It handles token management, message forma
 and streaming chat completions.
 
 This module has been updated to work with LangGraph-based chat workflows.
-The Agent classes use LangGraph and LangChain's AzureChatOpenAI instead of direct 
+The Agent classes use LangGraph and LangChain's AzureChatOpenAI instead of direct
 openai.AzureOpenAI client usage.
 
 Key Features:
@@ -26,7 +26,7 @@ Dependencies:
 """
 
 import re
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import streamlit as st
 import tiktoken
@@ -84,9 +84,7 @@ def count_xml_tags(text: str) -> int:
 
 
 def handle_chat_prompt(
-    prompt: str, 
-    messages: List[Dict[str, str]], 
-    agent: "Agent"
+    prompt: str, messages: List[Dict[str, str]], agent: "Agent"
 ) -> None:
     """Process a user prompt, send to Azure OpenAI via async LangGraph and display the response.
 
@@ -99,13 +97,13 @@ def handle_chat_prompt(
         None - updates the session state and UI directly
     """
     import asyncio
-    
+
     async def async_handle_chat_prompt():
         """Async implementation of chat prompt handling."""
         # Calculate tokens in the input
         input_tokens = count_tokens(messages)
         logger.debug("Input tokens: %d", input_tokens)
-        
+
         # Send the user's prompt to Azure OpenAI via async LangGraph and display the response
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
@@ -118,13 +116,13 @@ def handle_chat_prompt(
                 agent.model,
                 agent.temperature,
             )
-            async for chunk in agent.create_chat_completion(messages):
+            async for chunk in agent.create_chat_completion_async(messages):
                 # Process LangChain streaming chunks
-                if hasattr(chunk, 'content') and chunk.content:
+                if hasattr(chunk, "content") and chunk.content:
                     # Regular streaming chunk with content
                     full_response += chunk.content
                     message_placeholder.markdown(full_response + "▌")
-                elif hasattr(chunk, 'usage_info'):
+                elif hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                     # Final chunk with usage information
                     final_chunk = chunk
                 else:
@@ -143,7 +141,7 @@ def handle_chat_prompt(
 
         # Render the response text with potential Mermaid diagrams
         render_message(full_response)
-        
+
         return full_response, final_chunk
 
     # Cleanup prompt
@@ -166,16 +164,20 @@ def handle_chat_prompt(
             full_response, final_chunk = asyncio.run(async_handle_chat_prompt())
         except RuntimeError as e:
             if "cannot be called from a running event loop" in str(e):
-                logger.warning("Already in event loop, using fallback synchronous handling")
+                logger.warning(
+                    "Already in event loop, using fallback synchronous handling"
+                )
                 # If we're already in an event loop, fall back to a simpler approach
                 # This should be rare in normal Streamlit usage
                 message_placeholder = st.empty()
                 message_placeholder.markdown("*Generating response...*")
-                
+
                 # Simple fallback response
-                full_response = "The async agent is temporarily unavailable. Please try again."
+                full_response = (
+                    "The async agent is temporarily unavailable. Please try again."
+                )
                 final_chunk = None
-                
+
                 message_placeholder.empty()
                 render_message(full_response)
             else:
@@ -184,16 +186,16 @@ def handle_chat_prompt(
 
     # Add the response to the messages
     messages.append({"role": "assistant", "content": full_response})
+    copy_button(full_response, key=hex(hash(full_response)))
 
     # Display token usage
-    if final_chunk and hasattr(final_chunk, 'usage_info'):
-        copy_button(full_response, key=full_response)
-        usage = final_chunk.usage_info
-        input_tokens = count_tokens(messages[:-1])  # Calculate input tokens again for final display
+    if final_chunk and hasattr(final_chunk, "usage_metadata"):
+        usage = final_chunk.usage_metadata
+        logger.info(usage)
         st.caption(
             f"""Token usage for this interaction:
-        - Input tokens: {input_tokens}
-        - Output tokens: {usage['completion_tokens']}
+        - Input tokens: {usage['input_tokens']}
+        - Output tokens: {usage['output_tokens']}
         - Total tokens: {usage['total_tokens']}"""
         )
 

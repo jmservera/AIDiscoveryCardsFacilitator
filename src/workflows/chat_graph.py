@@ -34,6 +34,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
 from streamlit.logger import get_logger
 from typing_extensions import Annotated, TypedDict
 
@@ -101,7 +102,7 @@ class ChatGraph:
 
         return self._llm
 
-    def _create_graph(self) -> StateGraph:
+    def _create_graph(self) -> CompiledStateGraph:
         """
         Create the LangGraph workflow for chat completion.
 
@@ -211,27 +212,8 @@ class ChatGraph:
             # Get the LLM for streaming
             llm = self._get_azure_chat_openai()
 
-            full_content = ""
-            async for chunk in llm.astream(langchain_messages):
-                content = (
-                    chunk.content if hasattr(chunk, "content") and chunk.content else ""
-                )
-                if content:
-                    full_content += content
-                    yield chunk
-
-            # Yield final chunk with usage info
-            class FinalChunk:
-                def __init__(self, content: str):
-                    self.content = ""
-                    # Rough estimation of tokens for usage display
-                    self.usage_info = {
-                        "completion_tokens": len(content.split()) if content else 0,
-                        "prompt_tokens": 50,  # Estimate
-                        "total_tokens": len(content.split()) + 50 if content else 50,
-                    }
-
-            yield FinalChunk(full_content)
+            async for chunk in llm.astream(langchain_messages, stream_usage=True):
+                yield chunk
 
         except Exception as e:
             logger.warning(f"LangGraph execution failed, using fallback response: {e}")
