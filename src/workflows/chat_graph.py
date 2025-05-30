@@ -268,7 +268,7 @@ class ChatGraph:
         class FinalChunk:
             def __init__(self, content: str):
                 self.content = ""
-                self.usage_info = {
+                self.usage_metadata = {
                     "completion_tokens": len(content.split()) if content else 0,
                     "prompt_tokens": 50,  # Estimate
                     "total_tokens": len(content.split()) + 50 if content else 50,
