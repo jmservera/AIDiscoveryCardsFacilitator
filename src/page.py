@@ -33,7 +33,6 @@ from utils.openai_utils import handle_chat_prompt, render_message
 
 logger = get_logger(__name__)
 
-for a:
 
 class Page(abc.ABC):
     """

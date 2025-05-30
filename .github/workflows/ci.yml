@@ -23,7 +23,6 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r src/requirements.txt
-          python -m compileall src/
         shell: bash
 
       - name: compile

@@ -38,11 +38,14 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Check Python syntax
+      - name: install dependencies
         run: |
           pip install --upgrade pip
           pip install -r src/requirements.txt
-          python -m compileall src/
+        shell: bash
+
+      - name: compile
+        run: python -m compileall src/
         shell: bash
 
       - name: Install azd
