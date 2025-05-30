@@ -31,7 +31,7 @@ import streamlit as st
 from st_copy import copy_button
 from streamlit.logger import get_logger
 
-from agent_registry import agent_registry
+from agents.agent_registry import agent_registry
 from utils.openai_utils import handle_chat_prompt, load_prompt_files, render_message
 
 logger = get_logger(__name__)
@@ -156,6 +156,17 @@ def multiagent_page(
         if "messages" not in page:
             page["messages"] = get_system_messages_multiagent(personas, documents)
 
+        # Create a multi-agent instance for this page
+        if "agent" not in page:
+            from agents.multi_agent import MultiAgent
+            page["agent"] = MultiAgent(
+                agent_key=f"multiagent_{hash(tuple(personas))}",
+                personas=personas,
+                model=model,
+                documents=documents,
+                temperature=0.7
+            )
+
         # Display chat messages from history on app rerun
         for message in page["messages"]:
             if message["role"] != "system":
@@ -167,7 +178,7 @@ def multiagent_page(
 
         # Await a user message and handle the chat prompt when it comes in.
         if prompt := st.chat_input("Enter a message:"):
-            handle_chat_prompt(prompt, page, model)
+            handle_chat_prompt(prompt, page["messages"], page["agent"])
 
     return page
 
@@ -247,6 +258,17 @@ def agent_page(
         if "messages" not in page:
             page["messages"] = get_system_messages(persona, documents)
 
+        # Create a single agent instance for this page
+        if "agent" not in page:
+            from agents.single_agent import SingleAgent
+            page["agent"] = SingleAgent(
+                agent_key=f"single_{hash((persona, str(documents)))}",
+                persona=persona,
+                model=model,
+                documents=documents,
+                temperature=temperature or 0.7
+            )
+
         msg_count = 0
         # Display chat messages from history on app rerun
         for message in page["messages"]:
@@ -262,7 +284,7 @@ def agent_page(
 
         if prompt := st.chat_input("Enter a message:"):
             logger.debug("Received user prompt: %s", prompt)
-            handle_chat_prompt(prompt, page, model, temperature)
+            handle_chat_prompt(prompt, page["messages"], page["agent"])
 
         logger.debug("Adding reset button.")
         # run the prompt again
@@ -282,7 +304,7 @@ def agent_page(
                         message = page["messages"][-1]  # Get the last user message
                         page["messages"].pop()
 
-                    handle_chat_prompt(message["content"], page, model, temperature)
+                    handle_chat_prompt(message["content"], page["messages"], page["agent"])
                 else:
                     st.warning("No messages to rerun.")
         with col2:
