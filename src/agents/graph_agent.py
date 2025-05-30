@@ -1,13 +1,11 @@
 """
-single_agent.py
+graph_agent.py
 
-This module defines the SingleAgent class, an implementation of a single agent
+This module defines the GraphAgent class, an implementation of a decission tree agent
 with system message loading capabilities for use in conversational AI applications.
-It provides mechanisms to initialize an agent with a specific persona, model, and
-optional document context, and to retrieve system messages based on these parameters.
 
 Classes:
-- SingleAgent: Implements a single agent with persona and document-based system message loading.
+- GraphAgent: Implements a graph agent with persona and document-based system message loading.
 """
 
 from pathlib import Path
@@ -17,12 +15,12 @@ from streamlit.logger import get_logger
 
 from utils.openai_utils import load_prompt_files
 
-from .agent import PersonaAgent
+from .agent import Agent
 
 logger = get_logger(__name__)
 
 
-class SingleAgent(PersonaAgent):
+class GraphAgent(Agent):
     """
     Implementation of a single agent with system message loading capabilities.
     """
@@ -30,10 +28,10 @@ class SingleAgent(PersonaAgent):
     def __init__(
         self,
         agent_key: str,
-        persona: str,
-        model: str = "gpt-4o",
-        documents: Optional[Union[str, List[str]]] = None,
-        temperature: float = 0.7,
+        condition: str,
+        agents: List[str],
+        model: Optional[str],
+        temperature: Optional[float] = 0.7,
     ) -> None:
         """
         Initialize a SingleAgent with a specific persona.
@@ -52,8 +50,8 @@ class SingleAgent(PersonaAgent):
             The temperature setting for response generation. Defaults to 0.7.
         """
         super().__init__(agent_key, model, temperature)
-        self.persona = persona
-        self.documents = documents
+        self.condition = condition
+        self.agents = agents
 
     def get_system_messages(self) -> List[Dict[str, str]]:
         """

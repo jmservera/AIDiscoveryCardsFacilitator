@@ -23,8 +23,9 @@ Dependencies:
 - streamlit.logger
 """
 
+import abc
 import os
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 import openai
 import streamlit as st
@@ -41,7 +42,7 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-pre
 logger = get_logger(__name__)
 
 
-class Agent:
+class Agent(abc.ABC):
     """
     Base class for agent implementations.
 
@@ -50,13 +51,13 @@ class Agent:
     agent_key : str
         Unique identifier for the agent.
     model : str
-        The model to use for this agent.
+        The model to use for this agent. Defaults to "gpt-4o".
     temperature : float
         The temperature setting for response generation.
     """
 
     def __init__(
-        self, agent_key: str, model: str = "gpt-4o", temperature: float = 1
+        self, agent_key: str, model: Optional[str], temperature: Optional[float]
     ) -> None:
         """
         Initialize an Agent with configurable settings.
@@ -73,17 +74,6 @@ class Agent:
         self.agent_key = agent_key
         self.model = model
         self.temperature = temperature
-
-    def get_system_messages(self) -> List[Dict[str, str]]:
-        """
-        Get the system messages for this agent.
-
-        Returns:
-        --------
-        List[Dict[str, str]]
-            A list of system messages for the agent.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
 
     @staticmethod
     @st.cache_resource
@@ -146,9 +136,29 @@ class Agent:
         )
         # Create and return a new chat completion request
         return client.chat.completions.create(
-            model=self.model,
+            model=self.model if self.model else "gpt-4o",
             messages=self.format_messages(messages),
             stream=True,
             stream_options={"include_usage": True},
             temperature=self.temperature,
         )
+
+
+class PersonaAgent(Agent):
+    """
+    Implementation of a single agent with system message loading capabilities.
+    This class extends the base Agent class and provides specific functionality
+    for agents that have a persona and optional document context.
+    """
+
+    @abc.abstractmethod
+    def get_system_messages(self) -> List[Dict[str, str]]:
+        """
+        Get the system messages for this agent based on persona and documents.
+
+        Returns:
+        --------
+        List[Dict[str, str]]
+            A list of system messages for the agent.
+        """
+        pass

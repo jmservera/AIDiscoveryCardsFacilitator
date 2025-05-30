@@ -27,6 +27,7 @@ import yaml
 from streamlit.logger import get_logger
 
 from .agent import Agent
+from .graph_agent import GraphAgent
 from .single_agent import SingleAgent
 
 PAGES_FILE = Path(__file__).parent.parent / "config/pages.yaml"
@@ -133,6 +134,14 @@ class AgentRegistry:
                     model=model,
                     documents=documents,
                     temperature=temperature,
+                )
+            elif "condition" in agent_config:
+                return GraphAgent(
+                    agent_key=agent_key,
+                    condition=agent_config["condition"],
+                    model=model,
+                    temperature=temperature,
+                    agents=agent_config.get("agents", []),
                 )
             else:
                 logger.error(
