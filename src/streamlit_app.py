@@ -115,7 +115,7 @@ def main() -> None:
 
             # Determine if the user is an admin
             user_roles = st.session_state.get("roles")
-            is_admin = "admin" in user_roles
+            is_admin = user_roles and "admin" in user_roles
 
             # Convert YAML configuration to streamlit pages structure
             pages = {}

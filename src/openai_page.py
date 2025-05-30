@@ -14,7 +14,6 @@ Key Features:
 
 Page Types:
 - agent_page: Single agent chat interface with one persona and document context
-- multiagent_page: Multi-agent chat interface with multiple personas
 
 Dependencies:
 - streamlit: For UI components and session management
@@ -28,10 +27,10 @@ that can be integrated into a multi-page Streamlit application.
 from typing import Callable, Dict, List, Optional, Union
 
 import streamlit as st
+from agent_registry import agent_registry
 from st_copy import copy_button
 from streamlit.logger import get_logger
 
-from agent_registry import agent_registry
 from utils.openai_utils import handle_chat_prompt, load_prompt_files, render_message
 
 logger = get_logger(__name__)
@@ -59,126 +58,13 @@ def get_system_messages(
     return load_prompt_files(persona, documents)
 
 
-@st.cache_data
-def get_system_messages_multiagent(
-    personas: List[str], documents: Optional[List[str]] = None
-) -> List[Dict[str, str]]:
-    """
-    Return the initial messages for a multi-agent chat history.
-
-    Parameters:
-    -----------
-    personas : list[str]
-        List of paths to persona prompt files.
-    documents : list[Union[str, list[str]]], optional
-        List of paths to document files. If provided, each document is paired with the
-        corresponding persona. If a persona needs multiple documents, provide a list of lists.
-
-    Returns:
-    --------
-    list[dict[str, str]]
-        Combined list of message objects for all personas with their documents.
-    """
-    messages = []
-    for i, persona in enumerate(personas):
-        # Handle document pairing for this persona
-        persona_docs = None
-        if documents and i < len(documents):
-            persona_docs = documents[i]
-
-        logger.info(
-            "Loading messages for persona {persona} with documents {documents}",
-            persona=persona,
-            documents=persona_docs,
-        )
-        persona_messages = load_prompt_files(persona, persona_docs)
-        messages.extend(persona_messages)
-    return messages
-
-
-def multiagent_page(
-    personas: List[str],
-    model: str,
-    header: str,
-    subtitle: str,
-    documents: Optional[List[str]] = None,
-) -> Callable[[], None]:
-    """
-    Create a Streamlit chat page for interacting with multiple agent personas.
-
-    This function returns a page function that sets up a chatbot interface with multiple
-    personas. The page includes a title, subtitle, and a chat history that persists across
-    page reloads by storing it in the Streamlit session state.
-
-    Parameters:
-    -----------
-    personas : list[str]
-        A list of persona or role prompt file names that the assistant should adopt in the
-        conversation.
-    header : str
-        The title to display at the top of the page.
-    subtitle : str
-        The subtitle to display below the title.
-    documents : list[str], optional
-        A list of document or context files that the assistant should use as reference.
-        If provided, each document is paired with the corresponding persona.
-
-    Returns:
-    --------
-    function
-        A page function that can be called to render the chat interface.
-
-    Notes:
-    ------
-    The function relies on several external dependencies:
-    - get_system_messages_multiagent(): For initializing the chat with system messages
-    - handle_chat_prompt(): From the openai_utils module.
-                            Expected to process user inputs and generate responses
-    - copy_button(): Expected to add a copy button to assistant messages
-
-    The chat history is stored in st.session_state.pages keyed by the current URL.
-    """
-
-    def page() -> None:
-        st.title(header)
-        st.subheader(subtitle)
-
-        if "pages" not in st.session_state:
-            st.session_state.pages = {}
-
-        if st.context.url not in st.session_state.pages:
-            st.session_state.pages[st.context.url] = {
-                "name": header or "Multi-Agent Chat",
-            }
-
-        page = st.session_state.pages[st.context.url]
-        # Initialize chat history
-        if "messages" not in page:
-            page["messages"] = get_system_messages_multiagent(personas, documents)
-
-        # Display chat messages from history on app rerun
-        for message in page["messages"]:
-            if message["role"] != "system":
-                with st.chat_message(message["role"]):
-                    msg = message["content"]
-                    render_message(msg)
-                    if message["role"] == "assistant":
-                        copy_button(msg, key=msg)
-
-        # Await a user message and handle the chat prompt when it comes in.
-        if prompt := st.chat_input("Enter a message:"):
-            handle_chat_prompt(prompt, page, model)
-
-    return page
-
-
 def agent_page(
     persona: str,
     model: str,
     documents: Optional[Union[str, List[str]]] = None,
     header: Optional[str] = None,
     subtitle: Optional[str] = None,
-    temperature: float = None,
+    temperature: Optional[float] = None,
 ) -> Callable[[], None]:
     """
     Create a Streamlit chat page for interacting with an agent persona.
@@ -442,16 +328,6 @@ page_factory.register(
             cfg["header"],
             cfg["subtitle"],
         )
-    ),
-)
-page_factory.register(
-    "multiagent",
-    lambda cfg: multiagent_page(
-        cfg["personas"],
-        cfg.get("model", "gpt-4o"),
-        cfg["header"],
-        cfg["subtitle"],
-        cfg.get("documents", None),
     ),
 )
 

@@ -11,9 +11,6 @@ Agent:
 SingleAgent:
     Implementation of a single agent with one persona.
 
-MultiAgent:
-    Implementation of multiple agents with multiple personas.
-
 AgentRegistry:
     A class to manage and retrieve agent definitions from the unified YAML file.
 
@@ -30,7 +27,6 @@ import yaml
 from streamlit.logger import get_logger
 
 from .agent import Agent
-from .multi_agent import MultiAgent
 from .single_agent import SingleAgent
 
 PAGES_FILE = Path(__file__).parent.parent / "config/pages.yaml"
@@ -136,18 +132,6 @@ class AgentRegistry:
                     persona=agent_config["persona"],
                     model=model,
                     documents=documents,
-                    temperature=temperature,
-                )
-            elif "personas" in agent_config:
-                # Multi agent
-                logger.info(
-                    "Creating MultiAgent for key '%s' with model '%s'", agent_key, model
-                )
-                return MultiAgent(
-                    agent_key=agent_key,
-                    personas=agent_config["personas"],
-                    model=model,
-                    documents=agent_config.get("documents"),
                     temperature=temperature,
                 )
             else:
