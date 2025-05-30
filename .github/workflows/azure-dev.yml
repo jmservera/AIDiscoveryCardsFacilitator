@@ -1,3 +1,4 @@
+name: Azure DevOps CI/CD
 on:
   workflow_dispatch:
   push:
@@ -5,11 +6,11 @@ on:
     # Set this to the mainline branch you are using
     branches:
       - main
-    paths: 
-      - 'src/**'
-      - '.github/workflows/azure-dev.yml'
-      - 'infra/**'
-      - 'azure.yaml'
+    paths:
+      - "src/**"
+      - ".github/workflows/azure-dev.yml"
+      - "infra/**"
+      - "azure.yaml"
 
 # GitHub Actions workflow to deploy to Azure using azd
 # To configure required secrets for connecting to Azure, simply run `azd pipeline config`
@@ -32,9 +33,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+
+      - name: Check Python syntax
+        run: |
+          pip install --upgrade pip
+          pip install -r src/requirements.txt
+          python -m compileall src/
+        shell: bash
+
       - name: Install azd
         uses: Azure/setup-azd@v2.1.0
-      
+
       - name: Install Nodejs
         uses: actions/setup-node@v3
         with:
@@ -69,11 +82,11 @@ jobs:
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-          AZURE_PRINCIPAL_TYPE: 'ServicePrincipal'
+          AZURE_PRINCIPAL_TYPE: "ServicePrincipal"
 
       - name: Deploy Application
         run: azd deploy --no-prompt
         env:
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}          
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
