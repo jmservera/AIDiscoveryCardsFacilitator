@@ -3,28 +3,15 @@ Utility functions for interacting with Azure OpenAI API
 
 This module provides a set of utilities to authenticate, communicate with, and process
 responses from Azure OpenAI services. It handles token management, message formatting,
-and streaming chat completions using Azure OpenAI's API.
+and streaming chat completions.
+
+This module has been updated to work with LangGraph-based chat workflows.
+The Agent classes use LangGraph and LangChain's AzureChatOpenAI instead of direct
+openai.AzureOpenAI client usage.
 
 Key Features:
-        # Display the mermaid diagram
-        try:
-            # Set a more appropriate height based on number of lines in the diagram
-            # with a minimum height to ensure diagrams are properly displayed
-            line_count = diagram_code.count('\n') + 1
-            node_count = diagram_code.count('[') + diagram_code.count('{') + diagram_code.count('(')
-
-            # Adjust height based on complexity: more lines = more height
-            height = max(line_count * 30, node_count * 70, 400)  # Minimum 400px height
-
-            # Use container width (which adapts to the page width)
-            # Render the mermaid diagram with adjusted dimensions
-            st_mermaid(diagram_code, height=height, width="container")
-        except Exception as e:
-            logger.exception("Error rendering mermaid diagram: %s", e)
-            st.error(f"Failed to render diagram: {e}")
-            st.code(diagram_code, language="mermaid")uthentication with Azure OpenAI using DefaultAzureCredential
 - Token counting and management for input and output messages
-- Streaming chat completions with proper error handling
+- Streaming chat completions with proper error handling via LangGraph workflows
 - Loading and formatting system prompts from files
 - XML tag detection and handling for document embedding
 
@@ -33,23 +20,23 @@ Environment Variables:
 
 
 Dependencies:
-- openai: Main client for interacting with OpenAI API
-- azure.identity: For authentication with Azure
+- agents.agent: Uses LangGraph-powered Agent class
 - streamlit: For UI components and session management
 - tiktoken: For token counting
 """
 
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import streamlit as st
 import tiktoken
-from openai.types.chat import ChatCompletionChunk
 from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
 
-from agents.agent import Agent
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from agents.agent import Agent
 
 # Configure logging using Streamlit's logger
 logger = get_logger(__name__)
@@ -97,64 +84,52 @@ def count_xml_tags(text: str) -> int:
 
 
 def handle_chat_prompt(
-    prompt: str, messages: List[Dict[str, str]], agent: Agent
+    prompt: str, messages: List[Dict[str, str]], agent: "Agent"
 ) -> None:
-    """Process a user prompt, send to Azure OpenAI and display the response.
+    """Process a user prompt, send to Azure OpenAI via async LangGraph and display the response.
 
     Args:
         prompt: The user's text input
-        page: Dictionary containing page state including messages history
-        agent: Agent instance to use for chat completion
+        messages: List of chat messages
+        agent: Agent instance to handle the conversation
 
     Returns:
         None - updates the session state and UI directly
     """
-    # Cleanup prompt
-    if count_xml_tags(prompt) > 0:
-        logger.debug("Prompt contains XML tags.")
-        # embed documents to avoid harm
-        prompt = f"<documents>{prompt}</documents>"
+    import asyncio
 
-    # Echo the user's prompt to the chat window
-    messages.append({"role": "user", "content": prompt})
-    logger.debug("Writing user prompt to chat")
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    async def async_handle_chat_prompt():
+        """Async implementation of chat prompt handling."""
+        # Calculate tokens in the input
+        input_tokens = count_tokens(messages)
+        logger.debug("Input tokens: %d", input_tokens)
 
-    # Calculate tokens in the input
-    input_tokens = count_tokens(messages)
-    logger.debug("Input tokens: %d", input_tokens)
-    # Send the user's prompt to Azure OpenAI and display the response
-    with st.chat_message("assistant"):
+        # Send the user's prompt to Azure OpenAI via async LangGraph and display the response
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
         full_response = ""
-        completion: Optional[ChatCompletionChunk] = None
+        final_chunk = None
         try:
             logger.debug(
-                "Creating chat completion using agent %s with model %s and temperature %s",
+                "Creating async chat completion using agent %s with model %s and temperature %s",
                 agent.agent_key,
                 agent.model,
                 agent.temperature,
             )
-            response: ChatCompletionChunk
-            for response in agent.create_chat_completion(messages):
-                if response.choices:
-                    try:
-                        if response.choices[0].delta is not None:
-                            full_response += response.choices[0].delta.content or ""
-                            message_placeholder.markdown(full_response + "▌")
-                        else:
-                            logger.debug(response.choices[0].model_dump_json())
-                    except (AttributeError, IndexError) as e:
-                        logger.exception("Error processing response: %s", e)
-                        full_response += "An error happened, retry your request.\n"
-                elif not response.usage:
-                    logger.warning(
-                        "Received empty response from OpenAI API. %s",
-                        response,
-                    )
-                completion = response
+            async for chunk in agent.create_chat_completion_async(messages):
+                # Process LangChain streaming chunks
+                if hasattr(chunk, "content") and chunk.content:
+                    # Regular streaming chunk with content
+                    full_response += chunk.content
+                    message_placeholder.markdown(full_response + "▌")
+                elif hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                    # Final chunk with usage information
+                    final_chunk = chunk
+                else:
+                    logger.warning("Received unexpected chunk format: %s", chunk)
+        except Exception as e:
+            logger.exception("Error during async chat completion: %s", e)
+            full_response += "An error happened, retry your request.\n"
         finally:
             # Ensure we always clear the placeholder even if an error occurs
             if not full_response:
@@ -167,17 +142,61 @@ def handle_chat_prompt(
         # Render the response text with potential Mermaid diagrams
         render_message(full_response)
 
+        return full_response, final_chunk
+
+    # Cleanup prompt
+    if count_xml_tags(prompt) > 0:
+        logger.debug("Prompt contains XML tags.")
+        # embed documents to avoid harm
+        prompt = f"<documents>{prompt}</documents>"
+
+    # Echo the user's prompt to the chat window
+    messages.append({"role": "user", "content": prompt})
+    logger.debug("Writing user prompt to chat")
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Execute the async chat handling within the assistant context
+    with st.chat_message("assistant"):
+        try:
+            # Try to run the async function directly
+            # In most Streamlit contexts, this should work fine
+            full_response, final_chunk = asyncio.run(async_handle_chat_prompt())
+        except RuntimeError as e:
+            if "cannot be called from a running event loop" in str(e):
+                logger.warning(
+                    "Already in event loop, using fallback synchronous handling"
+                )
+                # If we're already in an event loop, fall back to a simpler approach
+                # This should be rare in normal Streamlit usage
+                message_placeholder = st.empty()
+                message_placeholder.markdown("*Generating response...*")
+
+                # Simple fallback response
+                full_response = (
+                    "The async agent is temporarily unavailable. Please try again."
+                )
+                final_chunk = None
+
+                message_placeholder.empty()
+                render_message(full_response)
+            else:
+                # Re-raise other RuntimeErrors
+                raise
+
     # Add the response to the messages
     messages.append({"role": "assistant", "content": full_response})
+    copy_button(full_response, key=hex(hash(full_response)))
 
     # Display token usage
-    if completion and completion.usage:
-        copy_button(full_response, key=full_response)
+    if final_chunk and hasattr(final_chunk, "usage_metadata"):
+        usage = final_chunk.usage_metadata
+        logger.info(usage)
         st.caption(
             f"""Token usage for this interaction:
-        - Input tokens: {input_tokens}
-        - Output tokens: {completion.usage.completion_tokens}
-        - Total tokens: {completion.usage.total_tokens}"""
+        - Input tokens: {usage['input_tokens']}
+        - Output tokens: {usage['output_tokens']}
+        - Total tokens: {usage['total_tokens']}"""
         )
 
 

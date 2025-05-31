@@ -11,18 +11,31 @@ Classes:
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
+from langchain_core.messages import BaseMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import Runnable
+from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
 from streamlit.logger import get_logger
+from typing_extensions import Annotated, TypedDict
 
 from utils.openai_utils import load_prompt_files
 
-from .agent import PersonaAgent
+from .agent import Agent
 
 logger = get_logger(__name__)
 
 
-class SingleAgent(PersonaAgent):
+class ChatState(TypedDict):
+    """State definition for the chat workflow."""
+
+    messages: Annotated[List[BaseMessage], add_messages]
+
+
+class SingleAgent(Agent):
     """
     Implementation of a single agent with system message loading capabilities.
     """
@@ -31,9 +44,9 @@ class SingleAgent(PersonaAgent):
         self,
         agent_key: str,
         persona: str,
-        model: str = "gpt-4o",
+        model: Optional[str],
+        temperature: Optional[float],
         documents: Optional[Union[str, List[str]]] = None,
-        temperature: float = 0.7,
     ) -> None:
         """
         Initialize a SingleAgent with a specific persona.
@@ -71,3 +84,45 @@ class SingleAgent(PersonaAgent):
             self.documents,
         )
         return load_prompt_files(self.persona, self.documents)
+
+    async def _chat_node(self, state: ChatState) -> Dict[str, Any]:
+        """
+        Chat node function for the LangGraph workflow.
+
+        Parameters:
+        -----------
+        state : ChatState
+            Current state containing the conversation messages.
+
+        Returns:
+        --------
+        Dict[str, Any]
+            Updated state with the AI response.
+        """
+        llm = self._get_azure_chat_openai()
+
+        # Invoke the LLM with the current messages
+        response = await llm.ainvoke(state["messages"])
+
+        # Return the updated state
+        return {"messages": [response]}
+
+    def create_chain(self) -> Runnable:  # [dict[Any, Any], BaseMessage]:
+        """
+        Create and return a compiled state graph for this agent.
+
+        Returns:
+        --------
+        CompiledStateGraph
+            A compiled state graph representing the agent's workflow.
+        """
+        if self._chain is None:
+            start_prompt = ChatPromptTemplate.from_messages(
+                [MessagesPlaceholder("messages")]
+            )
+            llm = self._get_azure_chat_openai()
+            chain = start_prompt | llm
+
+            return chain
+
+        return self._chain

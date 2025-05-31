@@ -37,7 +37,14 @@ agents:
     model: o4-mini
     temperature: 1
   test_agent:
-    condition: If the question is about design thinking return `design_thinking_expert`, or if the question is about the AI Discovery Cards return `ai_discovery_expert`, otherwise return `facilitator`
+    condition: |
+      You are an agent that must analyze the user question. \n
+      Question : {input} \n
+      if the question is about design thinking return "design_thinking_expert". \n
+      if the question is about the AI Discovery Cards return "ai_discovery_expert". \n
+      otherwise return "facilitator". \n
+      only answer with one of the words provided.
+      Your answer (design_thinking_expert/ai_discovery_expert/facilitator):
     model: o4-mini
     agents:
       - condition: design_thinking_expert
@@ -81,9 +88,8 @@ sections:
       url_path: ZermattNationalBank
       header: 🏦 Contoso Zermatt National Bank Representative
       subtitle: Ask me anything about our bank, internal processes and our day-to-day jobs.
-
     - type: agent
-      agent: pepe
+      agent: andermatt_works
       title: Andermatt Works
       icon: 🏗️
       url_path: AndermattWorks

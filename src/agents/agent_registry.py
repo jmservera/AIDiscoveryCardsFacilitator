@@ -112,7 +112,7 @@ class AgentRegistry:
 
         try:
             model = agent_config.get("model", "gpt-4o")
-            temperature = agent_config.get("temperature", 0.7)
+            temperature = agent_config.get("temperature")
 
             # Determine if it's a single or multi agent based on the config
             if "persona" in agent_config:

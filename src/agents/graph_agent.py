@@ -9,15 +9,29 @@ Classes:
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, TypedDict, Union
 
+from langchain_core.messages import BaseMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import Runnable
+from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
 from streamlit.logger import get_logger
+from typing_extensions import Annotated
 
 from utils.openai_utils import load_prompt_files
 
 from .agent import Agent
 
 logger = get_logger(__name__)
+
+
+class AgentState(TypedDict):
+    input: str
+    output: str
+    decision: str
+    messages: Annotated[Sequence[BaseMessage], add_messages]
 
 
 class GraphAgent(Agent):
@@ -62,10 +76,87 @@ class GraphAgent(Agent):
         List[Dict[str, str]]
             A list of system messages for the agent.
         """
-        logger.debug(
-            "Loading system messages for SingleAgent %s with persona %s and documents %s",
-            self.agent_key,
-            self.persona,
-            self.documents,
-        )
-        return load_prompt_files(self.persona, self.documents)
+
+        return []
+
+    def _agent_node(self, state) -> Dict[str, Any]:
+        return {"message": "dummy_message", "input": state["input"]}
+
+    def _start_agent(self, state) -> Dict[str, Any]:
+        """
+        Start the agent based on the condition evaluation.
+
+        Parameters:
+        -----------
+        state : ChatState
+            Current state containing the conversation messages.
+
+        Returns:
+        --------
+        Dict[str, Any]
+            Updated state with the selected agent's response.
+        """
+        # Here you would implement the logic to select and start the appropriate agent
+        # based on the condition. This is a placeholder implementation.
+        start_prompt = ChatPromptTemplate.from_messages([("system", self.condition)])
+        chain = start_prompt | self._get_azure_chat_openai()
+        response = chain.invoke({"input": state["input"]})
+        # take the decision from the response
+        decision = response.content.strip().lower()
+        # Return the response for the next agent (decision and input required coming fron the Agent State)
+        return {"decision": decision, "input": state["input"]}
+
+    def create_chain(self) -> Runnable:
+        """
+        Create and return a compiled state graph for this agent.
+
+        Returns:
+        --------
+        CompiledStateGraph
+            A compiled state graph representing the agent's workflow.
+        """
+        if self._chain is None:
+            try:
+                # Create the Workflow as StateGraph using the AgentState
+                workflow = StateGraph(AgentState)
+                # Add the nodes (start_agent, stock_agent, rag_agent)
+                workflow.add_node("start", self._start_agent)
+                workflow.add_node(
+                    "facilitator_agent",
+                    self._agent_node,
+                    metadata={"agent_key": "facilitator"},
+                )
+                workflow.add_node(
+                    "design_thinking_expert_agent",
+                    self._agent_node,
+                    metadata={"agent_key": "design_thinking_expert"},
+                )
+                workflow.add_node(
+                    "ai_discovery_expert_agent",
+                    self._agent_node,
+                    metadata={"agent_key": "ai_discovery_expert"},
+                )
+                # Add the conditional edge from start -> lamba (decision) -> stock_agent or rag_agent
+                workflow.add_conditional_edges(
+                    "start",
+                    lambda x: x["decision"],
+                    {
+                        "facilitator": "facilitator_agent",
+                        "design_thinking_expert": "design_thinking_expert_agent",
+                        "ai_discovery_expert": "ai_discovery_expert_agent",
+                    },
+                )
+                # Set the workflow entry point
+                workflow.set_entry_point("start")
+                # Add the final edges to the END node
+                workflow.add_edge("facilitator_agent", END)
+                workflow.add_edge("design_thinking_expert_agent", END)
+                workflow.add_edge("ai_discovery_expert_agent", END)
+                # Compile the workflow
+                self._chain = workflow.compile()
+
+            except Exception as e:
+                logger.error(f"Failed to create ConditionGraph: {e}")
+                raise
+
+        return self._chain

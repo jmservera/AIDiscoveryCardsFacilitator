@@ -25,7 +25,7 @@ import streamlit as st
 from st_copy import copy_button
 from streamlit.logger import get_logger
 
-from agents import SingleAgent, agent_registry
+from agents import Agent, agent_registry
 from utils.openai_utils import handle_chat_prompt, render_message
 
 logger = get_logger(__name__)
@@ -184,7 +184,7 @@ class AgentPage(Page):
         The agent instance that handles the conversation.
     """
 
-    def __init__(self, agent: SingleAgent, header: str, subtitle: str) -> None:
+    def __init__(self, agent: Agent, header: str, subtitle: str) -> None:
         """
         Initialize an AgentPage with an agent, header, and subtitle.
 
@@ -322,7 +322,7 @@ class PageFactory:
                     logger.error(error_msg)
                     raise ValueError(error_msg)
 
-                if isinstance(agent, SingleAgent):
+                if isinstance(agent, Agent):
                     page = AgentPage(agent, header, subtitle)
                 else:
                     error_msg = f"Unsupported agent type: {type(agent)}"
@@ -330,30 +330,7 @@ class PageFactory:
                     raise TypeError(error_msg)
 
             else:
-                # Default to single agent configuration
-                persona = page_config.get("persona", "prompts/facilitator_persona.md")
-                model = page_config.get("model", "gpt-4o")
-                document = page_config.get("document")
-                documents = page_config.get("documents")
-                temperature = page_config.get("temperature", 1)
-
-                # Determine document source
-                doc_source = None
-                if documents:
-                    doc_source = documents
-                elif document:
-                    doc_source = document
-
-                logger.debug("Creating custom SingleAgent with persona %s", persona)
-
-                agent = SingleAgent(
-                    agent_key="_custom_",  # Using a placeholder key
-                    persona=persona,
-                    model=model,
-                    documents=doc_source,
-                    temperature=temperature,
-                )
-                page = AgentPage(agent, header, subtitle)
+                raise ValueError("Unsupported page configuration: 'agent' key missing")
 
             # Return a function that renders the page
             return page.render
