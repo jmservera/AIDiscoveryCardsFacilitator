@@ -85,7 +85,7 @@ class Agent(abc.ABC):
         self._llm: Optional[AzureChatOpenAI] = None
         self._chain: Optional[Runnable] = None
 
-    def _get_azure_chat_openai(self) -> AzureChatOpenAI:
+    def _get_azure_chat_openai(self, tag: Optional[str] = None) -> AzureChatOpenAI:
         """
         Create and return an AzureChatOpenAI instance with authentication.
 
@@ -108,6 +108,7 @@ class Agent(abc.ABC):
                 temperature=self.temperature,
                 streaming=True,
                 stream_usage=True,
+                tags=[tag] if tag else None,
             )
 
         return self._llm

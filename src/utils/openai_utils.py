@@ -34,9 +34,7 @@ from st_copy import copy_button
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
 
-# Use TYPE_CHECKING to avoid circular imports
-if TYPE_CHECKING:
-    from agents.agent import Agent
+from agents import RESPONSE_TAG, Agent
 
 # Configure logging using Streamlit's logger
 logger = get_logger(__name__)
@@ -117,9 +115,8 @@ def handle_chat_prompt(
             )
             for chunk in agent.create_chat_completion(messages):
                 if isinstance(chunk, tuple):
-                    # If the chunk is a tuple, it means we received multiple messages
-                    # This is typical for LangChain streaming responses
-                    for msg in chunk:
+                    msg, metadata = chunk
+                    if "tags" in metadata and RESPONSE_TAG in metadata["tags"]:
                         if hasattr(msg, "content") and msg.content:
                             full_response += msg.content
                             message_placeholder.markdown(full_response + "▌")
@@ -132,6 +129,9 @@ def handle_chat_prompt(
                                 # Ignore empty content or LangChain step messages
                                 continue
                             logger.warning("Received unexpected chunk format: %s", msg)
+                    else:
+                        # Handle other types of messages (e.g., tool calls)
+                        logger.debug("Received non-response chunk: %s", msg)
                 else:
                     # Process LangChain streaming chunks
                     if hasattr(chunk, "content") and chunk.content:
@@ -190,55 +190,6 @@ def handle_chat_prompt(
         - Output tokens: {usage['output_tokens']}
         - Total tokens: {usage['total_tokens']}"""
         )
-
-
-@st.cache_data
-def load_prompt_files(
-    persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
-) -> List[Dict[str, str]]:
-    """Load content from prompt files and create initial messages.
-
-    Args:
-        persona_file_path: Path to the persona/system prompt file
-        content_file_paths: Path to a single content/context file, or a list of file paths.
-                          If None, only the persona prompt will be loaded.
-
-    Returns:
-        List of message objects with the system prompts loaded
-    """
-    logger.debug("Loading system messages from persona file: %s", persona_file_path)
-    # Read the persona file
-    with open(persona_file_path, "r", encoding="utf-8") as f:
-        system_prompt = f.read()
-    logger.debug("Adding guardrails to system prompt")
-    # Add security instructions to the system prompt
-    with open("prompts/guardrails.md", "r", encoding="utf-8") as f:
-        system_prompt += f.read()
-
-    messages = [{"role": "system", "content": system_prompt}]
-
-    # Handle content file(s)
-    if content_file_paths:
-        # Convert single string to list for uniform handling
-        if isinstance(content_file_paths, str):
-            content_file_paths = [content_file_paths]
-
-        # Process each content file
-        for file_path in content_file_paths:
-            try:
-                logger.debug("Loading content from file: %s", file_path)
-                with open(file_path, "r", encoding="utf-8") as f:
-                    system_document = f.read()
-                    messages.append(
-                        {
-                            "role": "system",
-                            "content": f"\n<documents>{system_document}</documents>",
-                        }
-                    )
-            except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
-                logger.exception("Error loading document file %s: %s", file_path, e)
-
-    return messages
 
 
 def extract_mermaid_diagrams(text: str) -> List[Tuple[str, str]]:

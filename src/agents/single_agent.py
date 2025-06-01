@@ -22,7 +22,7 @@ from langgraph.graph.state import CompiledStateGraph
 from streamlit.logger import get_logger
 from typing_extensions import Annotated, TypedDict
 
-from utils.openai_utils import load_prompt_files
+from utils.cached_loader import load_prompt_files
 
 from .agent import Agent
 
@@ -85,28 +85,6 @@ class SingleAgent(Agent):
         )
         return load_prompt_files(self.persona, self.documents)
 
-    def _chat_node(self, state: ChatState) -> Dict[str, Any]:
-        """
-        Chat node function for the LangGraph workflow.
-
-        Parameters:
-        -----------
-        state : ChatState
-            Current state containing the conversation messages.
-
-        Returns:
-        --------
-        Dict[str, Any]
-            Updated state with the AI response.
-        """
-        llm = self._get_azure_chat_openai()
-
-        # Invoke the LLM with the current messages
-        response = llm.invoke(state["messages"])
-
-        # Return the updated state
-        return {"messages": [response]}
-
     def create_chain(self) -> Runnable:  # [dict[Any, Any], BaseMessage]:
         """
         Create and return a compiled state graph for this agent.
@@ -116,11 +94,15 @@ class SingleAgent(Agent):
         CompiledStateGraph
             A compiled state graph representing the agent's workflow.
         """
+        from agents import RESPONSE_TAG
+
         if self._chain is None:
             start_prompt = ChatPromptTemplate.from_messages(
                 [MessagesPlaceholder("messages")]
             )
-            llm = self._get_azure_chat_openai()
+            # Single Agent is tagged as a response agent, this means
+            # responses from this agent will be show in the UI
+            llm = self._get_azure_chat_openai(tag=RESPONSE_TAG)
             chain = start_prompt | llm
 
             return chain
