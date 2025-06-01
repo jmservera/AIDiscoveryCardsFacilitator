@@ -185,19 +185,17 @@ class Agent(abc.ABC):
         )
         try:
 
-            langchain_messages = self._convert_to_langchain_messages(messages)
+            # langchain_messages = self._convert_to_langchain_messages(messages)
             chain = self.create_chain()
-            # aggregate = None
-            async for chunk in chain.astream(langchain_messages):
-                # aggregate = chunk if aggregate is None else aggregate + chunk
+            async for chunk in chain.astream(
+                {"messages": messages}, stream_mode="messages"
+            ):
                 yield chunk
-            # async for chunk in llm.astream(langchain_messages, stream_usage=True):
-            #     yield chunk
-            # print(f"Aggregate response: {aggregate}")
-            # yield aggregate
 
         except Exception as e:
-            logger.warning(f"LangGraph execution failed, using fallback response: {e}")
+            logger.exception(
+                "LangGraph execution failed, using fallback response: {e}", e
+            )
             fallback_content = (
                 "This is a mock response due to Azure authentication failure."
             )
@@ -214,7 +212,7 @@ class Agent(abc.ABC):
                     self.content = ""
                     self.usage_metadata = {
                         "completion_tokens": len(content.split()) if content else 0,
-                        "prompt_tokens": 50,  # Estimate
+                        "input_tokens": 50,  # Estimate
                         "total_tokens": len(content.split()) + 50 if content else 50,
                     }
 

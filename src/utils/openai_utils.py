@@ -117,16 +117,29 @@ def handle_chat_prompt(
                 agent.temperature,
             )
             async for chunk in agent.create_chat_completion_async(messages):
-                # Process LangChain streaming chunks
-                if hasattr(chunk, "content") and chunk.content:
-                    # Regular streaming chunk with content
-                    full_response += chunk.content
-                    message_placeholder.markdown(full_response + "▌")
-                elif hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
-                    # Final chunk with usage information
-                    final_chunk = chunk
+                if isinstance(chunk, tuple):
+                    # If the chunk is a tuple, it means we received multiple messages
+                    # This is typical for LangChain streaming responses
+                    logger.debug("Received chunk as tuple of messages: %s", chunk)
+                    for msg in chunk:
+                        if hasattr(msg, "content") and msg.content:
+                            full_response += msg.content
+                            message_placeholder.markdown(full_response + "▌")
+                        elif hasattr(msg, "usage_metadata") and msg.usage_metadata:
+                            final_chunk = msg
+                    else:
+                        logger.warning("Received unexpected chunk format: %s", chunk)
                 else:
-                    logger.warning("Received unexpected chunk format: %s", chunk)
+                    # Process LangChain streaming chunks
+                    if hasattr(chunk, "content") and chunk.content:
+                        # Regular streaming chunk with content
+                        full_response += chunk.content
+                        message_placeholder.markdown(full_response + "▌")
+                    elif hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                        # Final chunk with usage information
+                        final_chunk = chunk
+                    else:
+                        logger.warning("Received unexpected chunk format: %s", chunk)
         except Exception as e:
             logger.exception("Error during async chat completion: %s", e)
             full_response += "An error happened, retry your request.\n"

@@ -18,6 +18,10 @@
 agents:
   facilitator:
     persona: prompts/facilitator_persona.md
+    model: o4-mini
+    temperature: 1
+  ai_discovery_expert:
+    persona: prompts/ai_discovery_expert_persona.md
     document: prompts/ai_discovery_cards.md
     model: o4-mini
     temperature: 1
@@ -52,7 +56,7 @@ agents:
       - condition: facilitator
         agent: facilitator
       - condition: ai_discovery_expert
-        agent: facilitator
+        agent: ai_discovery_expert
 
 sections:
   Coach:

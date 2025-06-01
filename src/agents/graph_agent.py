@@ -43,7 +43,7 @@ class GraphAgent(Agent):
         self,
         agent_key: str,
         condition: str,
-        agents: List[str],
+        agents: List[Dict[str, str]],
         model: Optional[str],
         temperature: Optional[float] = 0.7,
     ) -> None:
@@ -79,8 +79,19 @@ class GraphAgent(Agent):
 
         return []
 
-    def _agent_node(self, state) -> Dict[str, Any]:
-        return {"message": "dummy_message", "input": state["input"]}
+    def _agent_node(self, state):
+        from .agent_registry import agent_registry
+
+        agent = agent_registry.get_agent(state["decision"])
+        if agent is None:
+            logger.error(f"Agent {state['decision']} not found in registry.")
+            raise ValueError(f"Agent {state['decision']} not found in registry.")
+
+        messages = agent.get_system_messages()
+        messages.append(state["messages"][-1])
+        chain = agent.create_chain()
+        msg = chain.invoke({"messages": messages})
+        return {"response": msg}
 
     def _start_agent(self, state) -> Dict[str, Any]:
         """
@@ -100,11 +111,13 @@ class GraphAgent(Agent):
         # based on the condition. This is a placeholder implementation.
         start_prompt = ChatPromptTemplate.from_messages([("system", self.condition)])
         chain = start_prompt | self._get_azure_chat_openai()
-        response = chain.invoke({"input": state["input"]})
+        input = state["input"] if "input" in state else state["messages"][-1].content
+
+        response = chain.invoke({"input": input})
         # take the decision from the response
         decision = response.content.strip().lower()
         # Return the response for the next agent (decision and input required coming fron the Agent State)
-        return {"decision": decision, "input": state["input"]}
+        return {"decision": decision, "input": input}
 
     def create_chain(self) -> Runnable:
         """
@@ -121,37 +134,25 @@ class GraphAgent(Agent):
                 workflow = StateGraph(AgentState)
                 # Add the nodes (start_agent, stock_agent, rag_agent)
                 workflow.add_node("start", self._start_agent)
-                workflow.add_node(
-                    "facilitator_agent",
-                    self._agent_node,
-                    metadata={"agent_key": "facilitator"},
-                )
-                workflow.add_node(
-                    "design_thinking_expert_agent",
-                    self._agent_node,
-                    metadata={"agent_key": "design_thinking_expert"},
-                )
-                workflow.add_node(
-                    "ai_discovery_expert_agent",
-                    self._agent_node,
-                    metadata={"agent_key": "ai_discovery_expert"},
-                )
-                # Add the conditional edge from start -> lamba (decision) -> stock_agent or rag_agent
+                decisions = {}
+                for agent in self.agents:
+                    workflow.add_node(
+                        agent["agent"],
+                        self._agent_node,
+                        metadata={"agent_key": agent},
+                    )
+                    # Add the final edges to the END node
+                    workflow.add_edge(agent["agent"], END)
+                    decisions[agent["agent"]] = agent["condition"]
+
+                # Add the conditional edge from start -> lamba (decision) -> defined agents
                 workflow.add_conditional_edges(
                     "start",
                     lambda x: x["decision"],
-                    {
-                        "facilitator": "facilitator_agent",
-                        "design_thinking_expert": "design_thinking_expert_agent",
-                        "ai_discovery_expert": "ai_discovery_expert_agent",
-                    },
+                    decisions,
                 )
                 # Set the workflow entry point
                 workflow.set_entry_point("start")
-                # Add the final edges to the END node
-                workflow.add_edge("facilitator_agent", END)
-                workflow.add_edge("design_thinking_expert_agent", END)
-                workflow.add_edge("ai_discovery_expert_agent", END)
                 # Compile the workflow
                 self._chain = workflow.compile()
 

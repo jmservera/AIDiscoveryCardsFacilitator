@@ -47,16 +47,28 @@
                         "required": [
                             "persona"
                         ],
-                        "oneOf": [
+                        "anyOf": [
                             {
-                                "required": [
-                                    "document"
+                                "oneOf": [
+                                    {
+                                        "required": [
+                                            "document"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "documents"
+                                        ]
+                                    }
                                 ]
                             },
                             {
-                                "required": [
-                                    "documents"
-                                ]
+                                "not": {
+                                    "required": [
+                                        "document",
+                                        "documents"
+                                    ]
+                                }
                             }
                         ],
                         "additionalProperties": false
