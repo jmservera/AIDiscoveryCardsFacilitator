@@ -27,16 +27,16 @@ Dependencies:
 
 import abc
 import os
-from typing import Any, AsyncIterator, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
-import streamlit as st
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from langchain_openai import AzureChatOpenAI
-from langgraph.graph.state import CompiledStateGraph
 from streamlit.logger import get_logger
+
+from utils.streamlit_context import with_streamlit_context
 
 load_dotenv()
 
@@ -159,14 +159,9 @@ class Agent(abc.ABC):
 
         return langchain_messages
 
-    async def create_chat_completion_async(
-        self, messages: List[Dict[str, str]]
-    ) -> AsyncIterator[Any]:
+    def create_chat_completion(self, messages: List[Dict[str, str]]) -> Iterator[Any]:
         """
-        Create and return a new chat completion request using async LangGraph workflow.
-
-        MIGRATION NOTE: This method now uses async LangGraph workflows instead of
-        synchronous wrappers, providing direct async behavior compatible with Streamlit.
+        Create and return a new chat completion request using LangGraph workflow.
 
         Parameters:
         -----------
@@ -175,11 +170,11 @@ class Agent(abc.ABC):
 
         Yields:
         -------
-        AsyncIterator[Any]
-            An async streaming response compatible with LangChain format.
+        Iterator[Any]
+            An streaming response compatible with LangChain format.
         """
         logger.debug(
-            "Creating async LangGraph chat completion for %d messages with model %s",
+            "Creating LangGraph chat completion for %d messages with model %s",
             len(messages),
             self.model,
         )
@@ -187,9 +182,7 @@ class Agent(abc.ABC):
 
             # langchain_messages = self._convert_to_langchain_messages(messages)
             chain = self.create_chain()
-            async for chunk in chain.astream(
-                {"messages": messages}, stream_mode="messages"
-            ):
+            for chunk in chain.stream({"messages": messages}, stream_mode="messages"):
                 yield chunk
 
         except Exception as e:

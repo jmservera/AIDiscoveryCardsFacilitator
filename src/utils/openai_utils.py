@@ -26,7 +26,7 @@ Dependencies:
 """
 
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import streamlit as st
 import tiktoken
@@ -86,7 +86,7 @@ def count_xml_tags(text: str) -> int:
 def handle_chat_prompt(
     prompt: str, messages: List[Dict[str, str]], agent: "Agent"
 ) -> None:
-    """Process a user prompt, send to Azure OpenAI via async LangGraph and display the response.
+    """Process a user prompt, send to Azure OpenAI via LangGraph and display the response.
 
     Args:
         prompt: The user's text input
@@ -96,39 +96,42 @@ def handle_chat_prompt(
     Returns:
         None - updates the session state and UI directly
     """
-    import asyncio
 
-    async def async_handle_chat_prompt():
-        """Async implementation of chat prompt handling."""
+    def handle_chat_prompt():
+        """Implementation of chat prompt handling."""
         # Calculate tokens in the input
         input_tokens = count_tokens(messages)
         logger.debug("Input tokens: %d", input_tokens)
 
-        # Send the user's prompt to Azure OpenAI via async LangGraph and display the response
+        # Send the user's prompt to Azure OpenAI via LangGraph and display the response
         message_placeholder = st.empty()
         message_placeholder.markdown("*Generating response...*")
         full_response = ""
         final_chunk = None
         try:
             logger.debug(
-                "Creating async chat completion using agent %s with model %s and temperature %s",
+                "Creating chat completion using agent %s with model %s and temperature %s",
                 agent.agent_key,
                 agent.model,
                 agent.temperature,
             )
-            async for chunk in agent.create_chat_completion_async(messages):
+            for chunk in agent.create_chat_completion(messages):
                 if isinstance(chunk, tuple):
                     # If the chunk is a tuple, it means we received multiple messages
                     # This is typical for LangChain streaming responses
-                    logger.debug("Received chunk as tuple of messages: %s", chunk)
                     for msg in chunk:
                         if hasattr(msg, "content") and msg.content:
                             full_response += msg.content
                             message_placeholder.markdown(full_response + "▌")
                         elif hasattr(msg, "usage_metadata") and msg.usage_metadata:
                             final_chunk = msg
-                    else:
-                        logger.warning("Received unexpected chunk format: %s", chunk)
+                        else:
+                            if (hasattr(msg, "content") and not msg.content) or (
+                                "langgraph_step" in msg and msg["langgraph_step"]
+                            ):
+                                # Ignore empty content or LangChain step messages
+                                continue
+                            logger.warning("Received unexpected chunk format: %s", msg)
                 else:
                     # Process LangChain streaming chunks
                     if hasattr(chunk, "content") and chunk.content:
@@ -141,7 +144,7 @@ def handle_chat_prompt(
                     else:
                         logger.warning("Received unexpected chunk format: %s", chunk)
         except Exception as e:
-            logger.exception("Error during async chat completion: %s", e)
+            logger.exception("Error during chat completion: %s", e)
             full_response += "An error happened, retry your request.\n"
         finally:
             # Ensure we always clear the placeholder even if an error occurs
@@ -169,33 +172,9 @@ def handle_chat_prompt(
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Execute the async chat handling within the assistant context
+    # Execute the chat handling within the assistant context
     with st.chat_message("assistant"):
-        try:
-            # Try to run the async function directly
-            # In most Streamlit contexts, this should work fine
-            full_response, final_chunk = asyncio.run(async_handle_chat_prompt())
-        except RuntimeError as e:
-            if "cannot be called from a running event loop" in str(e):
-                logger.warning(
-                    "Already in event loop, using fallback synchronous handling"
-                )
-                # If we're already in an event loop, fall back to a simpler approach
-                # This should be rare in normal Streamlit usage
-                message_placeholder = st.empty()
-                message_placeholder.markdown("*Generating response...*")
-
-                # Simple fallback response
-                full_response = (
-                    "The async agent is temporarily unavailable. Please try again."
-                )
-                final_chunk = None
-
-                message_placeholder.empty()
-                render_message(full_response)
-            else:
-                # Re-raise other RuntimeErrors
-                raise
+        full_response, final_chunk = handle_chat_prompt()
 
     # Add the response to the messages
     messages.append({"role": "assistant", "content": full_response})

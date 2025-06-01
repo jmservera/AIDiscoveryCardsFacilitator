@@ -85,7 +85,7 @@ class SingleAgent(Agent):
         )
         return load_prompt_files(self.persona, self.documents)
 
-    async def _chat_node(self, state: ChatState) -> Dict[str, Any]:
+    def _chat_node(self, state: ChatState) -> Dict[str, Any]:
         """
         Chat node function for the LangGraph workflow.
 
@@ -102,7 +102,7 @@ class SingleAgent(Agent):
         llm = self._get_azure_chat_openai()
 
         # Invoke the LLM with the current messages
-        response = await llm.ainvoke(state["messages"])
+        response = llm.invoke(state["messages"])
 
         # Return the updated state
         return {"messages": [response]}

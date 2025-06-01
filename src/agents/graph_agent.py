@@ -9,18 +9,18 @@ Classes:
 """
 
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, TypedDict, Union
+from typing import Any, Dict, List, Optional, Sequence, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from langgraph.graph.state import CompiledStateGraph
 from streamlit.logger import get_logger
 from typing_extensions import Annotated
 
 from utils.openai_utils import load_prompt_files
+from utils.streamlit_context import with_streamlit_context
 
 from .agent import Agent
 
@@ -79,6 +79,7 @@ class GraphAgent(Agent):
 
         return []
 
+    @with_streamlit_context  # as it potentially uses streamlit caching we need to ensure the context is set
     def _agent_node(self, state):
         from .agent_registry import agent_registry
 
@@ -93,6 +94,7 @@ class GraphAgent(Agent):
         msg = chain.invoke({"messages": messages})
         return {"response": msg}
 
+    @with_streamlit_context  # as it potentially uses streamlit caching we need to ensure the context is set
     def _start_agent(self, state) -> Dict[str, Any]:
         """
         Start the agent based on the condition evaluation.
