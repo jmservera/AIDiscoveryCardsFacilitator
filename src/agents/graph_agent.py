@@ -91,7 +91,7 @@ class GraphAgent(Agent):
         messages.append(state["messages"][-1])
         chain = agent.create_chain()
         msg = chain.invoke({"messages": messages})
-        return {"response": msg}
+        return {"output": msg}
 
     @with_streamlit_context  # as it potentially uses streamlit caching we need to ensure the context is set
     def _start_agent(self, state) -> Dict[str, Any]:
