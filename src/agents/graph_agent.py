@@ -117,8 +117,12 @@ class GraphAgent(Agent):
         response = chain.invoke({"input": input})
         # take the decision from the response
         decision = response.content.strip().lower()
-        # Return the response for the next agent (decision and input required coming fron the Agent State)
-        return {"decision": decision, "input": input}
+        # Populate the messages and output fields
+        messages = state["messages"] if "messages" in state else []
+        messages.append({"role": "system", "content": f"Decision made: {decision}"})
+        output = f"Agent decision: {decision}"
+        # Return the complete state dictionary
+        return {"decision": decision, "input": input, "messages": messages, "output": output}
 
     def create_chain(self) -> Runnable:
         """
