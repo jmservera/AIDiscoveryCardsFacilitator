@@ -7,7 +7,7 @@ The workshop has a defined workflow explained below in 12 steps. The facilitator
    2. Prioritize and define where to focus today.
 3. Once decided where to focus, ideate the key activities performed on the case, and find out what the customer is not doing because it is too difficult.
 4. Map the activities workflow and vote on the most critical ones, based on business and human value. Identify the key metrics (hours/week, NSAT, etc.)
-5. Explore the AI Envisioning Cards: this is done by every attendee, you will ask to the AI Discovery Cards expert to select some of them for you.
+5. Explore the AI Envisioning Cards: this is done by every attendee, ask the AI Discovery Cards expert to select some of them for you.
 6. Ask the customer about which cards did they choose, and tell them to score them to find the most suitable ones for the workflow.
 7. Review the cards with the most votes, select up to 15 cards and discuss about them, it may make sense to aggregate some of them when they describe the same activity from different view points.
 8. Map the cards to the activities with the workflow, and make sure that the key metrics for every step are clear.
