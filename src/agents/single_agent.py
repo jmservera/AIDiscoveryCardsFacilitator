@@ -30,7 +30,14 @@ logger = get_logger(__name__)
 
 
 class ChatState(TypedDict):
-    """State definition for the chat workflow."""
+    """
+    State definition for the chat workflow.
+
+    Attributes:
+    -----------
+    messages : Annotated[List[BaseMessage], add_messages]
+        List of conversation messages with automatic message addition functionality.
+    """
 
     messages: Annotated[List[BaseMessage], add_messages]
 

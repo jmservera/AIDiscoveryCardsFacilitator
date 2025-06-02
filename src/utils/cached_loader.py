@@ -1,3 +1,15 @@
+"""
+Cached prompt file loader utility.
+
+This module provides caching functionality for loading prompt files and creating
+initial message structures for AI agents. It uses Streamlit's caching mechanism
+to optimize file loading performance.
+
+Functions:
+----------
+load_prompt_files : Cached function to load persona and document files
+"""
+
 from typing import Dict, List, Optional, Union
 
 import streamlit as st
@@ -10,15 +22,35 @@ logger = get_logger(__name__)
 def load_prompt_files(
     persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
 ) -> List[Dict[str, str]]:
-    """Load content from prompt files and create initial messages.
+    """
+    Load content from prompt files and create initial messages.
 
-    Args:
-        persona_file_path: Path to the persona/system prompt file
-        content_file_paths: Path to a single content/context file, or a list of file paths.
-                          If None, only the persona prompt will be loaded.
+    This function reads a persona file and optional content files to create
+    a list of system messages. It automatically adds guardrails from the
+    guardrails.md file and handles multiple content files.
+
+    Parameters:
+    -----------
+    persona_file_path : str
+        Path to the persona/system prompt file.
+    content_file_paths : Optional[Union[str, List[str]]], optional
+        Path to a single content/context file, or a list of file paths.
+        If None, only the persona prompt will be loaded.
 
     Returns:
-        List of message objects with the system prompts loaded
+    --------
+    List[Dict[str, str]]
+        List of message objects with the system prompts loaded. Each message
+        has 'role' and 'content' keys.
+
+    Raises:
+    -------
+    FileNotFoundError
+        If the persona file or any content file cannot be found.
+    PermissionError
+        If file access is denied.
+    UnicodeDecodeError
+        If file encoding is incompatible.
     """
     logger.debug("Loading system messages from persona file: %s", persona_file_path)
     # Read the persona file

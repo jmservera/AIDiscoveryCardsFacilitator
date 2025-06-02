@@ -205,7 +205,7 @@ class Agent(abc.ABC):
                 def __init__(self, content: str):
                     self.content = ""
                     self.usage_metadata = {
-                        "completion_tokens": len(content.split()) if content else 0,
+                        "output_tokens": len(content.split()) if content else 0,
                         "input_tokens": 50,  # Estimate
                         "total_tokens": len(content.split()) + 50 if content else 50,
                     }
