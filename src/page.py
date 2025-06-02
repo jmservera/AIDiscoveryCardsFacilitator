@@ -217,8 +217,7 @@ class AgentPage(Page):
         # Initialize chat history
         if "messages" not in page:
             logger.debug("Initializing messages for agent %s", self.agent.agent_key)
-            page["messages"] = self.agent.get_system_messages()
-            logger.debug("Loaded %d system messages", len(page["messages"]))
+            page["messages"] = []
 
         msg_count = 0
         # Display chat messages from history on app rerun
@@ -278,7 +277,7 @@ class AgentPage(Page):
                 "🧹", help="Clear chat history", use_container_width=True
             )
             if reset_button:
-                self._reset_chat(page, self.agent.get_system_messages())
+                self._reset_chat(page, [])
 
 
 class PageFactory:

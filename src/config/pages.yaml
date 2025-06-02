@@ -40,14 +40,19 @@ agents:
     document: prompts/design_thinking.md
     model: o4-mini
     temperature: 1
-  test_agent:
+  multi_agent:
     condition: |
-      You are an agent that must analyze the user question. \n
-      Question : {input} \n
-      if the question is about design thinking return "design_thinking_expert". \n
-      if the question is about the AI Discovery Cards return "ai_discovery_expert". \n
-      otherwise return "facilitator". \n
-      only answer with one of the words provided.
+      You are an agent that must analyze the user thread.
+      User thread :
+      ---
+       {input} 
+      ---
+
+      - When the conversation needs to go through a design thinking session, or it needs to cover any design thinking topic (like brainstorming, reverse brainstorming, customer journey, etc.) return "design_thinking_expert".
+      - When you are in the step nr. 5 "Explore the AI Envisioning Cards" or for any question related to the cards, return "ai_discovery_expert".
+      - In any other case, or if there's any doubt not related to the previous topics return "facilitator", as it's the one who knows all the steps and can guide the user through the process.
+
+      Only answer with one of the words provided.
       Your answer (design_thinking_expert/ai_discovery_expert/facilitator):
     model: gpt-4.1-nano
     agents:
@@ -77,12 +82,12 @@ sections:
       subtitle: I'm your AI Design Thinking Expert and can guide you through the Design Thinking process step by step.
       admin_only: true # Only visible to admins
     - type: agent
-      agent: test_agent
-      title: Test Agent
+      agent: multi_agent
+      title: Multi Agent
       icon: 🧪
-      url_path: TestAgent
+      url_path: MultiAgent
       header: 🧪 AI Test Agent
-      subtitle: I'm a test agent that can help you with Design Thinking and AI Discovery Cards questions.
+      subtitle: I'm a multi-agent that can help you as a facilitator and have access to the Design Thinking and AI Discovery Cards experts.
       admin_only: true # Only visible to admins
   Customers:
     - type: agent

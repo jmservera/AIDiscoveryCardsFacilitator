@@ -101,7 +101,7 @@ class GraphAgent(Agent):
         self.condition = condition
         self.agents = agents
 
-    def get_system_messages(self) -> List[Dict[str, str]]:
+    def get_system_prompts(self) -> List[Dict[str, str]]:
         """
         Get the system messages for this graph agent.
 
@@ -141,8 +141,7 @@ class GraphAgent(Agent):
             logger.error(f"Agent {state['decision']} not found in registry.")
             raise ValueError(f"Agent {state['decision']} not found in registry.")
 
-        messages = agent.get_system_messages()
-        messages.append(state["messages"][-1])
+        messages = agent.get_system_prompts() + state["messages"]
         chain = agent.create_chain()
         msg = chain.invoke({"messages": messages}, stream_mode="messages")
         return {"output": msg}
@@ -169,9 +168,17 @@ class GraphAgent(Agent):
         # based on the condition. This is a placeholder implementation.
         start_prompt = ChatPromptTemplate.from_messages([("system", self.condition)])
         chain = start_prompt | self._get_azure_chat_openai()
-        input_text = (
-            state["input"] if "input" in state else state["messages"][-1].content
-        )
+        input_text = state["input"] if "input" in state else ""
+
+        # if input_text is empty, we can use the last messages from the conversation up to maximum 5 messages
+        if not input_text and "messages" in state:
+            messages = state["messages"][-5:]
+            input_text = " ".join(
+                [
+                    str(msg.content) if isinstance(msg, BaseMessage) else ""
+                    for msg in messages
+                ]
+            )
 
         response = chain.invoke({"input": input_text})
         # take the decision from the response - handle both string and complex responses
@@ -185,15 +192,13 @@ class GraphAgent(Agent):
         else:
             decision = str(response).strip().lower()
 
-        messages = state["messages"] if "messages" in state else []
-        messages.append({"role": "system", "content": f"Decision made: {decision}"})
         output = f"Agent decision: {decision}"
 
         # Return the response for the next agent (decision and input required from the Agent State)
         return {
             "decision": decision,
             "input": input_text,
-            "messages": messages,
+            "messages": state["messages"],
             "output": output,
         }
 

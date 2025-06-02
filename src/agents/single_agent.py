@@ -75,7 +75,7 @@ class SingleAgent(Agent):
         self.persona = persona
         self.documents = documents
 
-    def get_system_messages(self) -> List[Dict[str, str]]:
+    def get_system_prompts(self) -> List[Dict[str, str]]:
         """
         Get the system messages for this agent based on persona and documents.
 

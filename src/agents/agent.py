@@ -183,7 +183,11 @@ class Agent(abc.ABC):
 
             # langchain_messages = self._convert_to_langchain_messages(messages)
             chain = self.create_chain()
-            for chunk in chain.stream({"messages": messages}, stream_mode="messages"):
+            full_messages = self.get_system_prompts() + messages
+
+            for chunk in chain.stream(
+                {"messages": full_messages}, stream_mode="messages"
+            ):
                 yield chunk
 
         except Exception as e:
@@ -213,7 +217,7 @@ class Agent(abc.ABC):
             yield FinalChunk(fallback_content)
 
     @abc.abstractmethod
-    def get_system_messages(self) -> List[Dict[str, str]]:
+    def get_system_prompts(self) -> List[Dict[str, str]]:
         """
         Get the system messages for this agent.
 
