@@ -111,7 +111,6 @@ class SingleAgent(Agent):
             # responses from this agent will be show in the UI
             llm = self._get_azure_chat_openai(tag=RESPONSE_TAG)
             chain = start_prompt | llm
-
-            return chain
+            self._chain = chain
 
         return self._chain

@@ -145,7 +145,7 @@ class GraphAgent(Agent):
         messages.append(state["messages"][-1])
         chain = agent.create_chain()
         msg = chain.invoke({"messages": messages})
-        return {"response": msg}
+        return {"output": msg}
 
     @with_streamlit_context  # as it potentially uses streamlit caching we need to ensure the context is set
     def _start_agent(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,8 +185,17 @@ class GraphAgent(Agent):
         else:
             decision = str(response).strip().lower()
 
+        messages = state["messages"] if "messages" in state else []
+        messages.append({"role": "system", "content": f"Decision made: {decision}"})
+        output = f"Agent decision: {decision}"
+
         # Return the response for the next agent (decision and input required from the Agent State)
-        return {"decision": decision, "input": input_text}
+        return {
+            "decision": decision,
+            "input": input_text,
+            "messages": messages,
+            "output": output,
+        }
 
     def create_chain(self) -> Runnable:
         """

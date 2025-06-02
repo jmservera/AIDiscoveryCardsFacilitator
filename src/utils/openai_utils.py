@@ -115,10 +115,10 @@ def handle_chat_prompt(
             )
             agent_name: str = ""
             for chunk in agent.create_chat_completion(messages):
-                agent_name: str = ""
                 if isinstance(chunk, tuple):
                     msg, metadata = chunk
                     if "tags" in metadata and RESPONSE_TAG in metadata["tags"]:
+                        agent_name = ""  # Reset agent name for each new step
                         if hasattr(msg, "content") and msg.content:
                             full_response += msg.content
                             message_placeholder.markdown(full_response + "▌")
