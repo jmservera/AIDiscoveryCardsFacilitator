@@ -113,7 +113,9 @@ def handle_chat_prompt(
                 agent.model,
                 agent.temperature,
             )
+            agent_name: str = ""
             for chunk in agent.create_chat_completion(messages):
+                agent_name: str = ""
                 if isinstance(chunk, tuple):
                     msg, metadata = chunk
                     if "tags" in metadata and RESPONSE_TAG in metadata["tags"]:
@@ -126,12 +128,22 @@ def handle_chat_prompt(
                             if (hasattr(msg, "content") and not msg.content) or (
                                 "langgraph_step" in msg and msg["langgraph_step"]
                             ):
+                                # TEST: probably not needed anymore as we are
+                                #       now using the tuple instead of checking
+                                #       all the tuple elements individually
                                 # Ignore empty content or LangChain step messages
                                 continue
                             logger.warning("Received unexpected chunk format: %s", msg)
                     else:
                         # Handle other types of messages (e.g., tool calls)
-                        logger.debug("Received non-response chunk: %s", msg)
+
+                        if hasattr(msg, "content") and msg.content:
+                            agent_name += msg.content
+                            message_placeholder.markdown(
+                                f"📞Calling agent: {agent_name}▌"
+                            )
+                        else:
+                            logger.debug("Received non-response chunk: %s", msg)
                 else:
                     # Process LangChain streaming chunks
                     if hasattr(chunk, "content") and chunk.content:
