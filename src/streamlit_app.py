@@ -40,14 +40,18 @@ AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 
 def initialize_authentication():
     """
-    Initializes user authentication for the Streamlit app using configuration from a YAML file.
+    Initialize user authentication for the Streamlit app using configuration from a YAML file.
 
-    This function loads authentication and cookie settings from a local 'config.yaml' file,
+    This function loads authentication and cookie settings from a local 'auth-config.yaml' file,
     sets the Streamlit page layout, and returns an instance of the stauth.Authenticate class
     configured with the loaded credentials and cookie parameters.
 
     Returns:
-        stauth.Authenticate: An authentication object configured with credentials and cookie settings.
+    --------
+    Tuple[stauth.Authenticate, Any]
+        A tuple containing:
+        - An authentication object configured with credentials and cookie settings
+        - The loaded configuration dictionary
     """
     with open(AUTH_CONFIG_FILE, encoding="utf-8") as file:
         configuration = yaml.load(file, Loader=SafeLoader)
@@ -69,11 +73,16 @@ def initialize_authentication():
 
 def save_auth_config(configuration: Any) -> None:
     """
-    Saves the current authentication configuration to the auth-config.yaml file.
+    Save the current authentication configuration to the auth-config.yaml file.
 
     This function writes the current authentication configuration
     back to the auth-config.yaml file, ensuring that any changes made during the session are
     persisted for future use, and encrypts sensitive information like passwords.
+
+    Parameters:
+    -----------
+    configuration : Any
+        The authentication configuration dictionary to save.
     """
     with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as file:
         yaml.dump(configuration, file, default_flow_style=False, allow_unicode=True)
@@ -90,13 +99,28 @@ authenticator, config = initialize_authentication()
 
 
 def clear(_: Any) -> None:
-    """Clear the session state and redirect to the login page."""
+    """
+    Clear the session state and redirect to the login page.
+
+    This function removes all keys from the Streamlit session state,
+    effectively logging out the user and resetting the application state.
+
+    Parameters:
+    -----------
+    _ : Any
+        Unused parameter (callback argument from streamlit-authenticator).
+    """
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
 
 def login_page() -> None:
-    """Render the login page."""
+    """
+    Render the login page.
+
+    This function displays the authentication interface using streamlit-authenticator
+    and shows appropriate messages based on the authentication status.
+    """
     authenticator.login()
 
     if st.session_state.get("authentication_status") is False:
@@ -106,7 +130,16 @@ def login_page() -> None:
 
 
 def main() -> None:
-    """Main function to run the Streamlit application."""
+    """
+    Main function to run the Streamlit application.
+
+    This function handles the core application logic including:
+    - Checking authentication status
+    - Loading page configurations from YAML
+    - Setting up navigation with appropriate access controls
+    - Managing user roles and permissions
+    - Handling errors in page configuration loading
+    """
     if st.session_state.get("authentication_status"):
         # Load pages from pages.yaml file
         try:
@@ -115,7 +148,7 @@ def main() -> None:
 
             # Determine if the user is an admin
             user_roles = st.session_state.get("roles")
-            is_admin = "admin" in user_roles
+            is_admin = user_roles and "admin" in user_roles
 
             # Convert YAML configuration to streamlit pages structure
             pages = {}

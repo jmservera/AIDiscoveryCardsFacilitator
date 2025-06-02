@@ -11,9 +11,6 @@ Agent:
 SingleAgent:
     Implementation of a single agent with one persona.
 
-MultiAgent:
-    Implementation of multiple agents with multiple personas.
-
 AgentRegistry:
     A class to manage and retrieve agent definitions from the unified YAML file.
 
@@ -30,7 +27,7 @@ import yaml
 from streamlit.logger import get_logger
 
 from .agent import Agent
-from .multi_agent import MultiAgent
+from .graph_agent import GraphAgent
 from .single_agent import SingleAgent
 
 PAGES_FILE = Path(__file__).parent.parent / "config/pages.yaml"
@@ -115,7 +112,7 @@ class AgentRegistry:
 
         try:
             model = agent_config.get("model", "gpt-4o")
-            temperature = agent_config.get("temperature", 0.7)
+            temperature = agent_config.get("temperature")
 
             # Determine if it's a single or multi agent based on the config
             if "persona" in agent_config:
@@ -138,17 +135,13 @@ class AgentRegistry:
                     documents=documents,
                     temperature=temperature,
                 )
-            elif "personas" in agent_config:
-                # Multi agent
-                logger.info(
-                    "Creating MultiAgent for key '%s' with model '%s'", agent_key, model
-                )
-                return MultiAgent(
+            elif "condition" in agent_config:
+                return GraphAgent(
                     agent_key=agent_key,
-                    personas=agent_config["personas"],
+                    condition=agent_config["condition"],
                     model=model,
-                    documents=agent_config.get("documents"),
                     temperature=temperature,
+                    agents=agent_config.get("agents", []),
                 )
             else:
                 logger.error(
