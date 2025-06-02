@@ -39,6 +39,11 @@ var deployments = [
     skuName: 'GlobalStandard'
     modelVersion: '2025-04-16'
   }
+  {
+    name: 'gpt-4.1-nano'
+    skuName: 'GlobalStandard'
+    modelVersion: '2025-04-14'
+  }
 ]
 
 @batchSize(1)

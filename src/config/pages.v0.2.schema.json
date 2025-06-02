@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://example.com/schemas/pages.v0.2.schema.json",
+    "$id": "https://raw.githubusercontent.com/jmservera/AIDiscoveryCardsFacilitator/refs/heads/main/src/config/pages.v0.2.schema.json",
     "title": "Discovery Cards Agent Unified Schema",
     "version": "0.2.0",
     "type": "object",

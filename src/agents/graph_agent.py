@@ -144,7 +144,7 @@ class GraphAgent(Agent):
         messages = agent.get_system_messages()
         messages.append(state["messages"][-1])
         chain = agent.create_chain()
-        msg = chain.invoke({"messages": messages})
+        msg = chain.invoke({"messages": messages}, stream_mode="messages")
         return {"output": msg}
 
     @with_streamlit_context  # as it potentially uses streamlit caching we need to ensure the context is set
