@@ -26,7 +26,9 @@ Dependencies:
 """
 
 import re
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+import threading
+import time
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import streamlit as st
 import tiktoken
@@ -81,6 +83,10 @@ def count_xml_tags(text: str) -> int:
     return len(matches)
 
 
+# Thread-safe update mechanism
+update_lock = threading.Lock()
+
+
 def handle_chat_prompt(
     prompt: str, messages: List[Dict[str, str]], agent: "Agent"
 ) -> None:
@@ -95,17 +101,74 @@ def handle_chat_prompt(
         None - updates the session state and UI directly
     """
 
-    def handle_chat_prompt():
-        """Implementation of chat prompt handling."""
+    def safe_update_placeholder(placeholder, content: str) -> None:
+        """
+        Safely update a Streamlit placeholder with markdown content.
+
+        This function uses a thread lock to ensure thread-safe updates to the placeholder.
+        If the update fails, it logs a warning instead of raising an exception.
+
+        Args:
+            placeholder: A Streamlit placeholder object to update.
+            content (str): The markdown content to display in the placeholder.
+
+        Returns:
+            None
+
+        Note:
+            Requires 'update_lock' to be defined in the surrounding scope as a threading.Lock object.
+            Errors during update are logged but not raised to prevent UI disruption.
+        """
+        with update_lock:
+            try:
+                placeholder.markdown(content)
+            except Exception as e:
+                logger.warning("Failed to update placeholder: %s", e)
+
+    def stream_agent_response() -> Tuple[str, Optional[object]]:
+        """Stream chat completion response from agent and handle UI updates.
+
+        This function streams the response from an AI agent, displaying it in real-time
+        through a Streamlit interface. It handles both regular content streaming and
+        agent tool calls, buffering content to reduce UI update frequency.
+
+        The function processes different types of chunks from the agent's response:
+        - Content chunks with RESPONSE_TAG: Main response content
+        - Tool call messages: Display agent invocation status
+        - Usage metadata: Track token usage information
+
+        Returns:
+            Tuple[str, Optional[object]]: A tuple containing:
+                - str: The complete response text accumulated from all chunks
+                - Optional[object]: The final chunk containing usage metadata, or None
+
+        Notes:
+            - Uses a buffer system to accumulate content before UI updates to avoid race conditions
+            - Displays a loading indicator ("▌") while streaming
+            - Shows agent invocation status for tool calls (e.g., "📞Calling agent: ...")
+            - Safely handles placeholder cleanup even if errors occur
+            - Logs input token count and various processing steps for debugging
+            - Gracefully handles errors during streaming and displays error messages to user
+        """
         # Calculate tokens in the input
         input_tokens = count_tokens(messages)
         logger.debug("Input tokens: %d", input_tokens)
 
-        # Send the user's prompt to Azure OpenAI via LangGraph and display the response
+        # Create placeholder with unique key to avoid conflicts
+        placeholder_key = f"chat_placeholder_{int(time.time() * 1000)}"
         message_placeholder = st.empty()
-        message_placeholder.markdown("*Generating response...*")
+
+        # Initialize with loading state
+        try:
+            message_placeholder.markdown("*Generating response...*")
+        except Exception as e:
+            logger.warning("Failed to initialize placeholder: %s", e)
+            return "", None
+
         full_response = ""
         final_chunk = None
+        agent_name = ""
+
         try:
             logger.debug(
                 "Creating chat completion using agent %s with model %s and temperature %s",
@@ -113,95 +176,141 @@ def handle_chat_prompt(
                 agent.model,
                 agent.temperature,
             )
-            agent_name: str = ""
-            for chunk in agent.create_chat_completion(messages):
-                if isinstance(chunk, tuple):
-                    msg, metadata = chunk
-                    if "tags" in metadata and RESPONSE_TAG in metadata["tags"]:
-                        agent_name = ""  # Reset agent name for each new step
-                        if hasattr(msg, "content") and msg.content:
-                            full_response += msg.content
-                            message_placeholder.markdown(full_response + "▌")
-                        elif hasattr(msg, "usage_metadata") and msg.usage_metadata:
-                            final_chunk = msg
-                        else:
-                            if (hasattr(msg, "content") and not msg.content) or (
-                                "langgraph_step" in msg and msg["langgraph_step"]
-                            ):
-                                # TEST: probably not needed anymore as we are
-                                #       now using the tuple instead of checking
-                                #       all the tuple elements individually
-                                # Ignore empty content or LangChain step messages
-                                continue
-                            logger.warning("Received unexpected chunk format: %s", msg)
-                    else:
-                        # Handle other types of messages (e.g., tool calls)
 
-                        if hasattr(msg, "content") and msg.content:
-                            agent_name += msg.content
-                            message_placeholder.markdown(
-                                f"📞Calling agent: {agent_name}▌"
-                            )
+            # Buffer for accumulating content to reduce update frequency
+            content_buffer = ""
+            buffer_size = 50  # Characters to accumulate before updating
+
+            for chunk in agent.create_chat_completion(messages):
+                try:
+                    if isinstance(chunk, tuple):
+                        msg, metadata = chunk
+                        if "tags" in metadata and RESPONSE_TAG in metadata["tags"]:
+                            agent_name = ""  # Reset agent name for each new step
+                            if hasattr(msg, "content") and msg.content:
+                                content_buffer += msg.content
+
+                                # Update UI less frequently to avoid race conditions
+                                if len(content_buffer) >= buffer_size:
+                                    full_response += content_buffer
+                                    safe_update_placeholder(
+                                        message_placeholder, full_response + "▌"
+                                    )
+                                    content_buffer = ""
+
+                            elif hasattr(msg, "usage_metadata") and msg.usage_metadata:
+                                final_chunk = msg
+                            else:
+                                if (hasattr(msg, "content") and not msg.content) or (
+                                    "langgraph_step" in msg and msg["langgraph_step"]
+                                ):
+                                    continue
+                                logger.warning(
+                                    "Received unexpected chunk format: %s", msg
+                                )
                         else:
-                            logger.debug("Received non-response chunk: %s", msg)
-                else:
-                    # Process LangChain streaming chunks
-                    if hasattr(chunk, "content") and chunk.content:
-                        # Regular streaming chunk with content
-                        full_response += chunk.content
-                        message_placeholder.markdown(full_response + "▌")
-                    elif hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
-                        # Final chunk with usage information
-                        final_chunk = chunk
+                            # Handle other types of messages (e.g., tool calls)
+                            if hasattr(msg, "content") and msg.content:
+                                agent_name += msg.content
+                                safe_update_placeholder(
+                                    message_placeholder,
+                                    f"📞Calling agent: {agent_name}▌",
+                                )
+                            else:
+                                logger.debug("Received non-response chunk: %s", msg)
                     else:
-                        logger.warning("Received unexpected chunk format: %s", chunk)
+                        # Process LangChain streaming chunks
+                        if hasattr(chunk, "content") and chunk.content:
+                            content_buffer += chunk.content
+
+                            # Update UI less frequently
+                            if len(content_buffer) >= buffer_size:
+                                full_response += content_buffer
+                                safe_update_placeholder(
+                                    message_placeholder, full_response + "▌"
+                                )
+                                content_buffer = ""
+
+                        elif hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                            final_chunk = chunk
+                        else:
+                            logger.warning(
+                                "Received unexpected chunk format: %s", chunk
+                            )
+
+                except Exception as chunk_error:
+                    logger.warning("Error processing chunk: %s", chunk_error)
+                    continue
+
+            # Add any remaining buffered content
+            if content_buffer:
+                full_response += content_buffer
+
         except Exception as e:
             logger.exception("Error during chat completion: %s", e)
             full_response += "An error happened, retry your request.\n"
         finally:
-            # Ensure we always clear the placeholder even if an error occurs
+            # Ensure we always clear the placeholder safely
+            try:
+                if message_placeholder:
+                    message_placeholder.empty()
+                    # Add small delay to ensure cleanup
+                    time.sleep(0.1)
+            except Exception as cleanup_error:
+                logger.warning("Error during placeholder cleanup: %s", cleanup_error)
+
             if not full_response:
-                st.markdown("Error: No response received from the model, try again.")
+                st.error("Error: No response received from the model, try again.")
 
         logger.debug("Full response before rendering: %s", full_response)
-        # Clear the placeholder after streaming
-        message_placeholder.empty()
-
-        # Render the response text with potential Mermaid diagrams
-        render_message(full_response)
 
         return full_response, final_chunk
 
     # Cleanup prompt
     if count_xml_tags(prompt) > 0:
         logger.debug("Prompt contains XML tags.")
-        # embed documents to avoid harm
         prompt = f"<documents>{prompt}</documents>"
 
     # Echo the user's prompt to the chat window
     messages.append({"role": "user", "content": prompt})
     logger.debug("Writing user prompt to chat")
+
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # Add small delay to ensure user message is fully rendered
+    time.sleep(0.05)
+
     # Execute the chat handling within the assistant context
     with st.chat_message("assistant"):
-        full_response, final_chunk = handle_chat_prompt()
+        full_response, final_chunk = stream_agent_response()
 
-    # Add the response to the messages
-    messages.append({"role": "assistant", "content": full_response})
-    copy_button(full_response, key=hex(hash(full_response)))
+        # Only render if we have content and avoid duplicate rendering
+        if full_response:
+            # Clear any existing content first
+            st.empty()
 
-    # Display token usage
-    if final_chunk and hasattr(final_chunk, "usage_metadata"):
-        usage = final_chunk.usage_metadata
-        logger.info(usage)
-        st.caption(
-            f"""Token usage for this interaction:
-        - Input tokens: {usage['input_tokens']}
-        - Output tokens: {usage['output_tokens']}
-        - Total tokens: {usage['total_tokens']}"""
-        )
+            # Render the response text with potential Mermaid diagrams
+            render_message(full_response)
+
+            # Add the response to the messages
+            messages.append({"role": "assistant", "content": full_response})
+
+            # Add copy button with unique key
+            copy_button(
+                full_response, key=f"copy_{hex(hash(full_response))}_{int(time.time())}"
+            )
+
+            # Display token usage
+            if final_chunk and hasattr(final_chunk, "usage_metadata"):
+                usage = final_chunk.usage_metadata
+                logger.info(usage)
+                st.caption(
+                    f"""Token usage for this interaction:
+                - Input tokens: {usage['input_tokens']}
+                - Output tokens: {usage['output_tokens']}
+                - Total tokens: {usage['total_tokens']}"""
+                )
 
 
 def extract_mermaid_diagrams(text: str) -> List[Tuple[str, str]]:
