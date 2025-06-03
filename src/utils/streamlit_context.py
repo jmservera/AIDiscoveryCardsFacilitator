@@ -11,6 +11,10 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ct
 
 T = TypeVar("T", bound=Callable[..., Any])
 
+from streamlit.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def with_streamlit_context(fn: T) -> T:
     """
@@ -48,7 +52,6 @@ def with_streamlit_context(fn: T) -> T:
         Returns:
             Any: The return value from the wrapped function
         """
-
         add_script_run_ctx(ctx=ctx)
 
         # Call the callback.

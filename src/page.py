@@ -223,12 +223,16 @@ class AgentPage(Page):
         # Display chat messages from history on app rerun
         for message in page["messages"]:
             if message["role"] != "system":
-                with st.chat_message(message["role"]):
-                    msg = message["content"]
-                    render_message(msg)
-                    msg_count += 1
-                    if message["role"] == "assistant":
-                        copy_button(msg, key=msg)
+                placeholder = st.chat_message(message["role"])
+                msg = message["content"]
+                render_message(placeholder, msg)
+                msg_count += 1
+                if message["role"] == "assistant":
+                    copy_button(msg, key=msg)
+            else:
+                logger.warning(
+                    "System messages should not be listed in the chat history."
+                )
 
         # Await a user message and handle the chat prompt when it comes in
         if prompt := st.chat_input("Enter a message:"):

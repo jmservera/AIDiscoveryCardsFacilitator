@@ -18,7 +18,7 @@
 agents:
   facilitator:
     persona: prompts/facilitator_persona.md
-    model: o4-mini
+    model: gpt-4o
     temperature: 1
   ai_discovery_expert:
     persona: prompts/ai_discovery_expert_persona.md

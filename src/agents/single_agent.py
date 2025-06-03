@@ -51,8 +51,8 @@ class SingleAgent(Agent):
         self,
         agent_key: str,
         persona: str,
-        model: Optional[str],
-        temperature: Optional[float],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
         documents: Optional[Union[str, List[str]]] = None,
     ) -> None:
         """

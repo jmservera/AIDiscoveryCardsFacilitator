@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 import streamlit as st
 import tiktoken
 from st_copy import copy_button
+from streamlit.delta_generator import DeltaGenerator
 from streamlit.logger import get_logger
 from streamlit_mermaid import st_mermaid
 
@@ -121,11 +122,14 @@ def handle_chat_prompt(
         """
         with update_lock:
             try:
-                placeholder.markdown(content)
+                with placeholder.container():
+                    st.markdown(content)
             except Exception as e:
                 logger.warning("Failed to update placeholder: %s", e)
 
-    def stream_agent_response() -> Tuple[str, Optional[object]]:
+    def stream_agent_response(
+        message_placeholder: DeltaGenerator,
+    ) -> Tuple[str, Optional[object]]:
         """Stream chat completion response from agent and handle UI updates.
 
         This function streams the response from an AI agent, displaying it in real-time
@@ -154,16 +158,9 @@ def handle_chat_prompt(
         input_tokens = count_tokens(messages)
         logger.debug("Input tokens: %d", input_tokens)
 
-        # Create placeholder with unique key to avoid conflicts
-        placeholder_key = f"chat_placeholder_{int(time.time() * 1000)}"
-        message_placeholder = st.empty()
-
-        # Initialize with loading state
-        try:
-            message_placeholder.markdown("*Generating response...*")
-        except Exception as e:
-            logger.warning("Failed to initialize placeholder: %s", e)
-            return "", None
+        with message_placeholder.container():
+            # Initialize with loading state
+            st.markdown("*Generating response...* ▌")
 
         full_response = ""
         final_chunk = None
@@ -245,25 +242,16 @@ def handle_chat_prompt(
             # Add any remaining buffered content
             if content_buffer:
                 full_response += content_buffer
+                safe_update_placeholder(message_placeholder, full_response + "...")
 
         except Exception as e:
             logger.exception("Error during chat completion: %s", e)
             full_response += "An error happened, retry your request.\n"
         finally:
-            # Ensure we always clear the placeholder safely
-            try:
-                if message_placeholder:
-                    message_placeholder.empty()
-                    # Add small delay to ensure cleanup
-                    time.sleep(0.1)
-            except Exception as cleanup_error:
-                logger.warning("Error during placeholder cleanup: %s", cleanup_error)
-
             if not full_response:
                 st.error("Error: No response received from the model, try again.")
 
         logger.debug("Full response before rendering: %s", full_response)
-
         return full_response, final_chunk
 
     # Cleanup prompt
@@ -283,19 +271,20 @@ def handle_chat_prompt(
 
     # Execute the chat handling within the assistant context
     with st.chat_message("assistant"):
-        full_response, final_chunk = stream_agent_response()
+        placeholder = st.empty()
+        full_response, final_chunk = stream_agent_response(placeholder)
 
         # Only render if we have content and avoid duplicate rendering
         if full_response:
-            # Clear any existing content first
-            st.empty()
-
-            # Render the response text with potential Mermaid diagrams
-            render_message(full_response)
-
-            # Add the response to the messages
             messages.append({"role": "assistant", "content": full_response})
 
+            logger.debug("Rendering full response to chat")
+            time.sleep(1)  # Ensure the message is fully rendered
+            # Clear any existing content first
+            # Render the response text with potential Mermaid diagrams
+            render_message(placeholder, full_response)
+
+            logger.debug("Adding copy button to chat messages")
             # Add copy button with unique key
             copy_button(
                 full_response, key=f"copy_{hex(hash(full_response))}_{int(time.time())}"
@@ -346,7 +335,7 @@ def extract_mermaid_diagrams(text: str) -> List[Tuple[str, str]]:
     return results
 
 
-def render_message(message: str) -> None:
+def render_message(placeholder: DeltaGenerator, message: str) -> None:
     """Render the Markdown text.
        Supports Mermaid diagrams.
 
@@ -360,132 +349,141 @@ def render_message(message: str) -> None:
     # Extract mermaid diagrams from the response
     mermaid_diagrams = extract_mermaid_diagrams(message)
 
-    if not mermaid_diagrams:
-        # If no mermaid diagrams, just display the full response
-        st.markdown(message)
-        return
+    with update_lock:
 
-    logger.info("Found %d mermaid diagrams in the response", len(mermaid_diagrams))
-    # Process text with mermaid diagrams
-    remaining_text = message
-
-    for full_match, diagram_code in mermaid_diagrams:
-        # Split the text at the diagram position
-        parts = remaining_text.split(full_match, 1)
-
-        # Display the text before the diagram
-        if parts[0]:
-            st.markdown(parts[0])
-
-        # Display the mermaid diagram
-        try:
-            # Determine diagram type to better calculate height
-            diagram_type = "unknown"
-            if diagram_code.strip().startswith(
-                "graph"
-            ) or diagram_code.strip().startswith("flowchart"):
-                diagram_type = "flowchart"
-            elif diagram_code.strip().startswith("sequenceDiagram"):
-                diagram_type = "sequence"
-            elif diagram_code.strip().startswith("classDiagram"):
-                diagram_type = "class"
-            elif diagram_code.strip().startswith("gantt"):
-                diagram_type = "gantt"
-            elif diagram_code.strip().startswith("pie"):
-                diagram_type = "pie"
-            elif diagram_code.strip().startswith("journey"):
-                diagram_type = "journey"
-
-            # Calculate complexity metrics
-            line_count = diagram_code.count("\n") + 1
-            node_count = (
-                diagram_code.count("[")
-                + diagram_code.count("{")
-                + diagram_code.count("(")
-            )
-            connection_count = (
-                diagram_code.count("-->")
-                + diagram_code.count("==>")
-                + diagram_code.count("-.->")
-            )
-
-            # Get user's diagram scale preference
-            scale_factor = get_diagram_scale_factor()
-
-            # Adjust height based on diagram type and complexity
-            if diagram_type == "flowchart":
-                # Flowcharts can expand horizontally or vertically, depending on the type
-                # Possible FlowChart orientations are:
-                #   TB - Top to bottom
-                #   TD - Top-down/ same as top to bottom
-                #   BT - Bottom to top
-                #   RL - Right to left
-                #   LR - Left to right
-
-                # Check for orientation in the diagram
-                if any(orientation in diagram_code for orientation in ["RL", "LR"]):
-                    # Horizontal flowcharts need less height but more width consideration
-                    height = max(300, 3000 // line_count)
-                    # But, if they contain subgraphs or complex nodes,
-                    # we still need a minimum height
-                else:
-                    # Vertical flowcharts (TB, TD, BT) need more height
-                    height = max(node_count * 80, line_count * 25, 400)
-
-            elif diagram_type == "sequence":
-                # Sequence diagrams need more height per interaction
-                height = max(line_count * 30, connection_count * 60, 500)
-            elif diagram_type == "class":
-                # Class diagrams tend to be taller
-                height = max(node_count * 100, line_count * 25, 600)
-            elif diagram_type == "gantt":
-                # Gantt charts need height based on tasks
-                task_count = diagram_code.count(":")
-                height = max(task_count * 60, line_count * 20, 400)
-            elif diagram_type == "pie":
-                # Pie charts are generally more compact
-                height = max(line_count * 20, 400)
-            elif diagram_type == "journey":
-                # Journey diagrams height is inversely proportional to length
-                height = max(300, 3000 // line_count)
+        logger.debug("Cleaning up placeholder before rendering")
+        with placeholder.empty():  # Clear any previous content
+            if not mermaid_diagrams:
+                logger.debug("No mermaid diagrams found in the response")
+                # If no mermaid diagrams, just display the full response
+                st.markdown(message)
             else:
-                # Default calculation for unknown types
-                height = max(line_count * 30, node_count * 70, 500)
-
-            # Apply user scaling preference
-            height = int(height * scale_factor)
-
-            # Apply user-defined scaling factor
-            scale_factor = get_diagram_scale_factor()
-            height = int(height * scale_factor)
-
-            tab1, tab2 = st.tabs(["Diagram", "Code"])
-            with tab1:
-                st_mermaid(
-                    diagram_code,
-                    height=str(height),
-                    width="container",
-                    pan=False,
-                    zoom=False,
+                logger.info(
+                    "Found %d mermaid diagrams in the response", len(mermaid_diagrams)
                 )
-            with tab2:
-                # Use container width to adapt to page size
-                st.markdown(f"```mermaid\n{diagram_code}\n```")
-                copy_button(diagram_code, key=diagram_code)
-        except Exception as e:
-            logger.exception("Error rendering mermaid diagram: %s", e)
-            st.error(f"Failed to render diagram: {e}")
-            st.code(diagram_code, language="mermaid")
+                # Process text with mermaid diagrams
+                remaining_text = message
 
-        # Update remaining text
-        if len(parts) > 1:
-            remaining_text = parts[1]
-        else:
-            remaining_text = ""
+                for full_match, diagram_code in mermaid_diagrams:
+                    # Split the text at the diagram position
+                    parts = remaining_text.split(full_match, 1)
 
-    # Display any remaining text after the last diagram
-    if remaining_text:
-        st.markdown(remaining_text)
+                    # Display the text before the diagram
+                    if parts[0]:
+                        st.markdown(parts[0])
+
+                    # Display the mermaid diagram
+                    try:
+                        # Determine diagram type to better calculate height
+                        diagram_type = "unknown"
+                        if diagram_code.strip().startswith(
+                            "graph"
+                        ) or diagram_code.strip().startswith("flowchart"):
+                            diagram_type = "flowchart"
+                        elif diagram_code.strip().startswith("sequenceDiagram"):
+                            diagram_type = "sequence"
+                        elif diagram_code.strip().startswith("classDiagram"):
+                            diagram_type = "class"
+                        elif diagram_code.strip().startswith("gantt"):
+                            diagram_type = "gantt"
+                        elif diagram_code.strip().startswith("pie"):
+                            diagram_type = "pie"
+                        elif diagram_code.strip().startswith("journey"):
+                            diagram_type = "journey"
+
+                        # Calculate complexity metrics
+                        line_count = diagram_code.count("\n") + 1
+                        node_count = (
+                            diagram_code.count("[")
+                            + diagram_code.count("{")
+                            + diagram_code.count("(")
+                        )
+                        connection_count = (
+                            diagram_code.count("-->")
+                            + diagram_code.count("==>")
+                            + diagram_code.count("-.->")
+                        )
+
+                        # Get user's diagram scale preference
+                        scale_factor = get_diagram_scale_factor()
+
+                        # Adjust height based on diagram type and complexity
+                        if diagram_type == "flowchart":
+                            # Flowcharts can expand horizontally or vertically, depending on the type
+                            # Possible FlowChart orientations are:
+                            #   TB - Top to bottom
+                            #   TD - Top-down/ same as top to bottom
+                            #   BT - Bottom to top
+                            #   RL - Right to left
+                            #   LR - Left to right
+
+                            # Check for orientation in the diagram
+                            if any(
+                                orientation in diagram_code
+                                for orientation in ["RL", "LR"]
+                            ):
+                                # Horizontal flowcharts need less height but more width consideration
+                                height = max(300, 3000 // line_count)
+                                # But, if they contain subgraphs or complex nodes,
+                                # we still need a minimum height
+                            else:
+                                # Vertical flowcharts (TB, TD, BT) need more height
+                                height = max(node_count * 80, line_count * 25, 400)
+
+                        elif diagram_type == "sequence":
+                            # Sequence diagrams need more height per interaction
+                            height = max(line_count * 30, connection_count * 60, 500)
+                        elif diagram_type == "class":
+                            # Class diagrams tend to be taller
+                            height = max(node_count * 100, line_count * 25, 600)
+                        elif diagram_type == "gantt":
+                            # Gantt charts need height based on tasks
+                            task_count = diagram_code.count(":")
+                            height = max(task_count * 60, line_count * 20, 400)
+                        elif diagram_type == "pie":
+                            # Pie charts are generally more compact
+                            height = max(line_count * 20, 400)
+                        elif diagram_type == "journey":
+                            # Journey diagrams height is inversely proportional to length
+                            height = max(300, 3000 // line_count)
+                        else:
+                            # Default calculation for unknown types
+                            height = max(line_count * 30, node_count * 70, 500)
+
+                        # Apply user scaling preference
+                        height = int(height * scale_factor)
+
+                        # Apply user-defined scaling factor
+                        scale_factor = get_diagram_scale_factor()
+                        height = int(height * scale_factor)
+
+                        tab1, tab2 = st.tabs(["Diagram", "Code"])
+                        with tab1:
+                            st_mermaid(
+                                diagram_code,
+                                height=str(height),
+                                width="container",
+                                pan=False,
+                                zoom=False,
+                            )
+                        with tab2:
+                            # Use container width to adapt to page size
+                            st.markdown(f"```mermaid\n{diagram_code}\n```")
+                            copy_button(diagram_code, key=diagram_code)
+                    except Exception as e:
+                        logger.exception("Error rendering mermaid diagram: %s", e)
+                        st.error(f"Failed to render diagram: {e}")
+                        st.code(diagram_code, language="mermaid")
+
+                    # Update remaining text
+                    if len(parts) > 1:
+                        remaining_text = parts[1]
+                    else:
+                        remaining_text = ""
+
+                # Display any remaining text after the last diagram
+                if remaining_text:
+                    st.markdown(remaining_text)
 
 
 def get_diagram_scale_factor() -> float:
