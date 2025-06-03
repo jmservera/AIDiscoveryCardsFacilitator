@@ -25,21 +25,22 @@ Note: The application expects the configuration files in the same directory with
 format.
 """
 
-import asyncio
-import os
+from logging import getLogger
 from typing import Any, Dict, List, Optional
 
 import bcrypt
 import chainlit as cl
 import yaml
 from chainlit.types import ThreadDict
+from langchain.schema.runnable.config import RunnableConfig
 from yaml.loader import SafeLoader
 
-from agents import Agent, agent_registry
-from utils.cached_loader import load_prompt_files
+from agents import agent_registry
 
 AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 PAGES_CONFIG_FILE = "./config/pages.yaml"
+
+logger = getLogger(__name__)
 
 
 class ChainlitAgentManager:
@@ -405,23 +406,65 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
         # Add user message to history
         history.append({"role": "user", "content": content})
 
+        msg = cl.Message(content="")
         # Show typing indicator
-        async with cl.Step(name="🤔 Thinking...") as step:
+        # async with cl.Step(name="🤔 Thinking...") as step:
+        with cl.Step(name="🤔 Thinking...") as step:
             # Process the message with the agent
-            response = await agent.achat(history)
-            step.output = "Agent processing complete"
+            step.input = content
+            async for chunk in agent.astream(
+                history,
+                config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
+            ):
+                response = ""
+                if isinstance(chunk, tuple):
+                    message, metadata = chunk
+                    if (
+                        metadata
+                        and "tags" in metadata
+                        and "response" in metadata["tags"]
+                    ):
+                        # Handle agent response chunk
+                        response = message.content
+                    else:
+                        if metadata and "langgraph_node" in metadata:
+                            logger.info(
+                                f"Agent response Node: {metadata["langgraph_node"]}"
+                            )
+                        else:
+                            logger.info(f"Agent response: {metadata}")
 
+                    if metadata and "langgraph_node" in metadata:
+                        step.name = metadata["langgraph_node"]
+                        step.output = (
+                            f"Processing with agent node: {metadata['langgraph_node']}"
+                        )
+                        logger.info(
+                            f"Agent response Node: {metadata['langgraph_node']}"
+                        )
+
+                else:
+                    response = chunk.content
+                if response:
+                    step.output = "Generating response..."
+                    await step.stream_token(response)
+                    await msg.stream_token(response)
+            step.output = "Agent processing complete"
+            await step.send()
+        await msg.send()
+
+        response = msg.content.strip() if msg.content else None
         # Add assistant response to history
         if response:
             history.append({"role": "assistant", "content": response})
             cl.user_session.set("conversation_history", history)
 
-            # Send the response
-            await cl.Message(content=response).send()
-        else:
-            await cl.Message(
-                content="❌ No response from agent. Please try again."
-            ).send()
+        #     # Send the response
+        #     await cl.Message(content=response).send()
+        # else:
+        #     await cl.Message(
+        #         content="❌ No response from agent. Please try again."
+        #     ).send()
 
     except Exception as e:
         cl.logger.error(f"Error processing with agent {agent_key}: {e}")

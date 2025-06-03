@@ -10,15 +10,12 @@ Functions:
 load_prompt_files : Cached function to load persona and document files
 """
 
+from logging import getLogger
 from typing import Dict, List, Optional, Union
 
-import streamlit as st
-from streamlit.logger import get_logger
-
-logger = get_logger(__name__)
+logger = getLogger(__name__)
 
 
-@st.cache_data
 def load_prompt_files(
     persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
 ) -> List[Dict[str, str]]:

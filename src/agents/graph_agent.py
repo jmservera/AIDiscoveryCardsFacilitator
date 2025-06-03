@@ -21,6 +21,7 @@ Dependencies:
 - utils.streamlit_context: For Streamlit context preservation
 """
 
+from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, TypedDict
 
@@ -29,12 +30,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from streamlit.logger import get_logger
 from typing_extensions import Annotated
 
 from .agent import Agent
 
-logger = get_logger(__name__)
+logger = getLogger(__name__)
 
 
 class AgentState(TypedDict):

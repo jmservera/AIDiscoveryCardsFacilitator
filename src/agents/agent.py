@@ -27,21 +27,22 @@ Dependencies:
 
 import abc
 import os
-from typing import Any, Dict, Iterator, List, Optional
+from logging import getLogger
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
 
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
+from langchain.schema.runnable.config import RunnableConfig
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from langchain_openai import AzureChatOpenAI
-from streamlit.logger import get_logger
 
 load_dotenv()
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
 
-logger = get_logger(__name__)
+logger = getLogger(__name__)
 
 
 class Agent(abc.ABC):
@@ -157,6 +158,24 @@ class Agent(abc.ABC):
                 langchain_messages.append(HumanMessage(content=content))
 
         return langchain_messages
+
+    def astream(
+        self, messages: List[Dict[str, str]], config: RunnableConfig
+    ) -> AsyncIterator[Any]:
+        try:
+
+            # langchain_messages = self._convert_to_langchain_messages(messages)
+            chain = self.create_chain()
+            full_messages = self.get_system_prompts() + messages
+
+            return chain.astream(
+                {"messages": full_messages}, config=config, stream_mode="messages"
+            )
+        except Exception as e:
+            logger.exception(
+                "Async LangGraph execution failed, using fallback response: %s", e
+            )
+            raise e
 
     def create_chat_completion(self, messages: List[Dict[str, str]]) -> Iterator[Any]:
         """
