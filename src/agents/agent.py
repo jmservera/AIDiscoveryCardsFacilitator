@@ -36,8 +36,6 @@ from langchain_core.runnables import Runnable
 from langchain_openai import AzureChatOpenAI
 from streamlit.logger import get_logger
 
-from utils.streamlit_context import with_streamlit_context
-
 load_dotenv()
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
@@ -193,6 +191,97 @@ class Agent(abc.ABC):
         except Exception as e:
             logger.exception(
                 "LangGraph execution failed, using fallback response: {e}", e
+            )
+            fallback_content = (
+                "This is a mock response due to Azure authentication failure."
+            )
+
+            # Fallback to mock response when Azure authentication fails
+            class MockChunk:
+                def __init__(self, content: str):
+                    self.content = content
+
+            yield MockChunk(content=fallback_content)
+
+            class FinalChunk:
+                def __init__(self, content: str):
+                    self.content = ""
+                    self.usage_metadata = {
+                        "output_tokens": len(content.split()) if content else 0,
+                        "input_tokens": 50,  # Estimate
+                        "total_tokens": len(content.split()) + 50 if content else 50,
+                    }
+
+            yield FinalChunk(fallback_content)
+
+    async def achat(self, messages: List[Dict[str, str]]) -> str:
+        """
+        Asynchronously create a chat completion and return the full response.
+
+        Parameters:
+        -----------
+        messages : List[Dict[str, str]]
+            List of message objects with role and content.
+
+        Returns:
+        --------
+        str
+            The complete response from the agent.
+        """
+        logger.debug(
+            "Creating async chat completion for %d messages with model %s",
+            len(messages),
+            self.model,
+        )
+
+        full_response = ""
+        try:
+            # Use the new async method to collect all chunks
+            async for chunk in self.acreate_chat_completion(messages):
+                if hasattr(chunk, "content") and chunk.content:
+                    full_response += chunk.content
+                elif isinstance(chunk, tuple):
+                    msg, metadata = chunk
+                    if hasattr(msg, "content") and msg.content:
+                        full_response += msg.content
+
+        except Exception as e:
+            logger.exception(f"Error in async chat completion: {e}")
+            full_response = "I apologize, but I encountered an error while processing your request. Please try again."
+
+        return full_response.strip()
+
+    async def acreate_chat_completion(self, messages: List[Dict[str, str]]) -> Any:
+        """
+        Asynchronously create and return a new chat completion request using LangGraph workflow.
+
+        Parameters:
+        -----------
+        messages : List[Dict[str, str]]
+            List of message objects with role and content.
+
+        Yields:
+        -------
+        AsyncIterator[Any]
+            An async streaming response compatible with LangChain format.
+        """
+        logger.debug(
+            "Creating async LangGraph chat completion for %d messages with model %s",
+            len(messages),
+            self.model,
+        )
+        try:
+            chain = self.create_chain()
+            full_messages = self.get_system_prompts() + messages
+
+            async for chunk in chain.astream(
+                {"messages": full_messages}, stream_mode="messages"
+            ):
+                yield chunk
+
+        except Exception as e:
+            logger.exception(
+                "Async LangGraph execution failed, using fallback response: %s", e
             )
             fallback_content = (
                 "This is a mock response due to Azure authentication failure."

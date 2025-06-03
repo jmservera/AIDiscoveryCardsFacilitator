@@ -24,6 +24,21 @@
                 "--client.toolbarMode",
                 "developer"
             ]
+        },
+        {
+            "name": "Python Debugger: Chainlit",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/src",
+            "module": "chainlit",
+            "args": [
+                "run",
+                "chainlit_app.py",
+                "--port",
+                "8000",
+                "--host",
+                "0.0.0.0"
+            ]
         }
     ]
 }
