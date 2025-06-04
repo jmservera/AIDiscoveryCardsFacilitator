@@ -92,6 +92,7 @@ sections:
       subtitle: I'm your AI Design Thinking Expert and can guide you through the Design Thinking process step by step.
       admin_only: true # Only visible to admins
     - type: agent
+      default: true
       agent: multi_agent
       title: Multi Agent
       icon: 🧪

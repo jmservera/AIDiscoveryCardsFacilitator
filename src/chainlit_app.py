@@ -36,6 +36,7 @@ import yaml
 from chainlit.secret import random_secret
 from chainlit.types import ThreadDict
 from langchain.schema.runnable.config import RunnableConfig
+from langchain_core.callbacks import Callbacks, StreamingStdOutCallbackHandler
 from yaml.loader import SafeLoader
 
 from agents import RESPONSE_TAG, agent_registry
@@ -114,6 +115,7 @@ class ChainlitAgentManager:
                         "subtitle": page_config["subtitle"],
                         "section": section_name,
                         "config": self.agents_config.get(agent_key, {}),
+                        "default": page_config.get("default", False),
                     }
 
         return available_agents
@@ -252,11 +254,22 @@ async def start() -> None:
 
     # Create agent selection message
     agent_list = []
+    current: Optional[str] = None
     for agent_key, agent_info in available_agents.items():
+        is_default = agent_info.get("default", False)
+        if is_default:
+            # Set default agent if specified
+            cl.user_session.set("current_agent", agent_key)
+            current = agent_info["title"]
         agent_list.append(
-            f"{agent_info['icon']} **{agent_info['title']}** (`{agent_key}`) - {agent_info['subtitle']}"
+            f"{agent_info['icon']} **{agent_info['title']}** (`{agent_key}`) {'[*default*] ' if is_default else ''}- {agent_info['subtitle']}"
         )
 
+    start_instruction = (
+        "*Choose an agent to begin your AI Discovery Cards experience!*"
+        if current is None
+        else f"*Choose an agent or start chatting with the current agent:* **{current}**"
+    )
     welcome_message = f"""
 # 🤖 Welcome to AI Discovery Cards Agent
 
@@ -275,7 +288,7 @@ For example: `/switch facilitator`
 You can also type `/help` for more commands or `/list` to see available agents.
 
 ---
-*Choose an agent to begin your AI Discovery Cards experience!*
+{start_instruction}
 """
 
     await cl.Message(content=welcome_message).send()
@@ -446,50 +459,57 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
         history.append({"role": "user", "content": content})
 
         msg = cl.Message(content="")
+        from langchain_core.callbacks import get_usage_metadata_callback
+
         # Show typing indicator
         # async with cl.Step(name="🤔 Thinking...") as step:
         with cl.Step(name=agent_key) as step:
             # Process the message with the agent
             step.input = content
-            async for chunk in agent.astream(
-                history,
-                config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
-            ):
-                response = ""
-                if isinstance(chunk, tuple):
-                    message, metadata = chunk
-                    if (
-                        metadata
-                        and "tags" in metadata
-                        and RESPONSE_TAG in metadata["tags"]
-                    ):
-                        # Handle agent response chunk
-                        response = message.content
-                    else:
-                        if metadata and "langgraph_node" in metadata:
-                            logger.info(
-                                f"Agent response Node: {metadata["langgraph_node"]}"
-                            )
+            with get_usage_metadata_callback() as cb:
+                async for chunk in agent.astream(
+                    history,
+                    config=RunnableConfig(
+                        callbacks=[
+                            StreamingStdOutCallbackHandler(),
+                            cl.LangchainCallbackHandler(),
+                        ]
+                    ),
+                ):
+                    response = ""
+                    if isinstance(chunk, tuple):
+                        message, metadata = chunk
+                        if (
+                            metadata
+                            and "tags" in metadata
+                            and RESPONSE_TAG in metadata["tags"]
+                        ):
+                            # Handle agent response chunk
+                            response = message.content
                         else:
-                            logger.info(f"Agent response: {metadata}")
+                            if metadata and "langgraph_node" in metadata:
+                                logger.info(
+                                    f"Agent response Node: {metadata["langgraph_node"]}"
+                                )
+                            else:
+                                logger.info(f"Agent response: {metadata}")
 
-                    if metadata and "langgraph_node" in metadata:
-                        step.name = metadata["langgraph_node"]
-                        step.output = (
-                            f"Processing with agent node: {metadata['langgraph_node']}"
-                        )
-                        logger.info(
-                            f"Agent response Node: {metadata['langgraph_node']}"
-                        )
-
-                else:
-                    response = chunk.content
-                if response:
-                    step.output = "Generating response..."
-                    await step.stream_token(response)
-                    await msg.stream_token(response)
-            step.output = "Agent processing complete"
-            await step.send()
+                        if metadata and "langgraph_node" in metadata:
+                            step.name = metadata["langgraph_node"]
+                            step.output = f"Processing with agent node: {metadata['langgraph_node']}"
+                            logger.info(
+                                f"Agent response Node: {metadata['langgraph_node']}"
+                            )
+                    else:
+                        response = chunk.content
+                    if cb.usage_metadata:
+                        step.output = cb.usage_metadata
+                    if response:
+                        step.output = "Generating response..."
+                        await step.stream_token(response)
+                        await msg.stream_token(response)
+                step.output = cb.usage_metadata
+                await step.send()
         await msg.send()
 
         response = msg.content.strip() if msg.content else None

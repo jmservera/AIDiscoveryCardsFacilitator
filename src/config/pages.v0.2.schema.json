@@ -142,6 +142,10 @@
                         "type": {
                             "const": "agent"
                         },
+                        "default": {
+                            "type": "boolean",
+                            "description": "If true, this agent will be the default one."
+                        },
                         "agent": {
                             "type": "string",
                             "$dynamicRef": "#agentNames"
