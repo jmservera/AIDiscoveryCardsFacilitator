@@ -36,7 +36,6 @@ import yaml
 from chainlit.secret import random_secret
 from chainlit.types import ThreadDict
 from langchain.schema.runnable.config import RunnableConfig
-from langchain_core.callbacks import Callbacks, StreamingStdOutCallbackHandler
 from yaml.loader import SafeLoader
 
 from agents import RESPONSE_TAG, agent_registry
@@ -151,7 +150,7 @@ agent_manager = ChainlitAgentManager()
 
 
 @cl.password_auth_callback
-def auth_callback(username: str, password: str) -> Optional[cl.User]:
+async def auth_callback(username: str, password: str) -> Optional[cl.User]:
     """
     Authenticate user using credentials from auth-config.yaml.
 
@@ -338,7 +337,9 @@ async def handle_command(command: str, user: cl.User) -> None:
     parts = command[1:].split()
     cmd = parts[0].lower() if parts else ""
 
-    available_agents = cl.user_session.get("available_agents", {})
+    available_agents: Dict[str, Dict[str, Any]] = (
+        cl.user_session.get("available_agents", {}) or {}
+    )
 
     if cmd == "help":
         help_text = """
@@ -453,7 +454,9 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
             return
 
         # Get conversation history from session
-        history = cl.user_session.get("conversation_history", [])
+        history: List[Dict[str, str]] = (
+            cl.user_session.get("conversation_history", []) or []
+        )
 
         # Add user message to history
         history.append({"role": "user", "content": content})
@@ -471,7 +474,6 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
                     history,
                     config=RunnableConfig(
                         callbacks=[
-                            StreamingStdOutCallbackHandler(),
                             cl.LangchainCallbackHandler(),
                         ]
                     ),
@@ -540,9 +542,10 @@ async def on_chat_resume(thread: ThreadDict) -> None:
         cl.user_session.set("available_agents", available_agents)
 
         # Restore conversation history if available
-        if "conversation_history" in thread.get("metadata", {}):
+        metadata = thread.get("metadata", {})
+        if metadata and "conversation_history" in metadata:
             cl.user_session.set(
-                "conversation_history", thread["metadata"]["conversation_history"]
+                "conversation_history", metadata["conversation_history"]
             )
 
 
