@@ -26,12 +26,14 @@ format.
 """
 
 import os
-from logging import basicConfig, getLogger
+from logging import getLogger
 from typing import Any, Dict, List, Optional
 
 import bcrypt
 import chainlit as cl
+import dotenv
 import yaml
+from chainlit.secret import random_secret
 from chainlit.types import ThreadDict
 from langchain.schema.runnable.config import RunnableConfig
 from yaml.loader import SafeLoader
@@ -44,6 +46,14 @@ PAGES_CONFIG_FILE = "./config/pages.yaml"
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 logger = getLogger(__name__)
 logger.setLevel(LOGLEVEL)
+
+dotenv.load_dotenv()
+if not os.getenv("CHAINLIT_AUTH_SECRET"):
+    logger.warning(
+        "CHAINLIT_AUTH_SECRET is not set. Authentication will not be secure. Generating a random secret."
+    )
+    os.environ["CHAINLIT_AUTH_SECRET"] = random_secret()
+    dotenv.set_key(".env", "CHAINLIT_AUTH_SECRET", os.environ["CHAINLIT_AUTH_SECRET"])
 
 
 class ChainlitAgentManager:
@@ -183,6 +193,32 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
             else:
                 # For demo purposes, allow simple password check
                 # In production, use only bcrypt
+
+                # review all passwords in the config file and hash them
+                modified = False
+                for user, user_data in credentials.items():
+                    stored_password = user_data.get("password", "")
+                    if not stored_password.startswith("$2b$"):
+                        # If the password is not hashed, hash it
+                        logger.warning(
+                            f"Password for user '{user}' is not hashed. Hashing now."
+                        )
+                        # Hash the password if it's not already hashed
+                        hashed_password = bcrypt.hashpw(
+                            stored_password.encode("utf-8"),
+                            bcrypt.gensalt(),
+                        ).decode("utf-8")
+                        user_data["password"] = hashed_password
+                        config["credentials"]["usernames"][user] = user_data
+                        modified = True
+                    else:
+                        logger.info(
+                            f"Password for user '{user}' is already hashed. Skipping."
+                        )
+                if modified:
+                    with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as file:
+                        yaml.dump(config, file)
+
                 if password == "admin" or password == stored_password:
                     return cl.User(
                         identifier=username,
