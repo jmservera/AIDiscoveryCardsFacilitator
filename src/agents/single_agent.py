@@ -10,19 +10,39 @@ Classes:
 - SingleAgent: Implements a single agent with persona and document-based system message loading.
 """
 
+import os
+from logging import getLogger
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
-from streamlit.logger import get_logger
+from langchain_core.messages import BaseMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import Runnable
+from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
+from typing_extensions import Annotated, TypedDict
 
-from utils.openai_utils import load_prompt_files
+from utils.cached_loader import load_prompt_files
 
 from .agent import Agent
 
-PAGES_FILE = Path(__file__).parent / "config/pages.yaml"
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
+logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
-logger = get_logger(__name__)
+class ChatState(TypedDict):
+    """
+    State definition for the chat workflow.
+
+    Attributes:
+    -----------
+    messages : Annotated[List[BaseMessage], add_messages]
+        List of conversation messages with automatic message addition functionality.
+    """
+
+    messages: Annotated[List[BaseMessage], add_messages]
 
 
 class SingleAgent(Agent):
@@ -34,9 +54,9 @@ class SingleAgent(Agent):
         self,
         agent_key: str,
         persona: str,
-        model: str = "gpt-4o",
-        documents: Optional[Union[str, List[str]]] = None,
-        temperature: float = 0.7,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        documents: Optional[Union[str, frozenset[str]]] = None,
     ) -> None:
         """
         Initialize a SingleAgent with a specific persona.
@@ -58,7 +78,7 @@ class SingleAgent(Agent):
         self.persona = persona
         self.documents = documents
 
-    def get_system_messages(self) -> List[Dict[str, str]]:
+    def get_system_prompts(self) -> List[Dict[str, str]]:
         """
         Get the system messages for this agent based on persona and documents.
 
@@ -74,3 +94,26 @@ class SingleAgent(Agent):
             self.documents,
         )
         return load_prompt_files(self.persona, self.documents)
+
+    def create_chain(self) -> Runnable:  # [dict[Any, Any], BaseMessage]:
+        """
+        Create and return a compiled state graph for this agent.
+
+        Returns:
+        --------
+        CompiledStateGraph
+            A compiled state graph representing the agent's workflow.
+        """
+        from agents import RESPONSE_TAG
+
+        if self._chain is None:
+            start_prompt = ChatPromptTemplate.from_messages(
+                [MessagesPlaceholder("messages")]
+            )
+            # Single Agent is tagged as a response agent, this means
+            # responses from this agent will be show in the UI
+            llm = self._get_azure_chat_openai(tag=RESPONSE_TAG)
+            chain = start_prompt | llm
+            self._chain = chain
+
+        return self._chain

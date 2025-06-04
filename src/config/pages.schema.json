@@ -91,55 +91,6 @@
                                 }
                             },
                             "additionalProperties": false
-                        },
-                        {
-                            "type": "object",
-                            "required": [
-                                "type",
-                                "personas",
-                                "title",
-                                "icon",
-                                "url_path",
-                                "header",
-                                "subtitle"
-                            ],
-                            "properties": {
-                                "type": {
-                                    "const": "multiagent"
-                                },
-                                "personas": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    },
-                                    "minItems": 1
-                                },
-                                "documents": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    }
-                                },
-                                "title": {
-                                    "type": "string"
-                                },
-                                "icon": {
-                                    "type": "string"
-                                },
-                                "url_path": {
-                                    "type": "string"
-                                },
-                                "header": {
-                                    "type": "string"
-                                },
-                                "subtitle": {
-                                    "type": "string"
-                                },
-                                "admin_only": {
-                                    "type": "boolean"
-                                }
-                            },
-                            "additionalProperties": false
                         }
                     ]
                 }

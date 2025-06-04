@@ -176,6 +176,3 @@ Citations:
 [25] https://online.hbs.edu/blog/post/design-thinking-examples
 [26] https://www.innovationtraining.org/design-thinking-workshop-resources/
 [27] https://www.mural.co/templates/design-thinking-workshop
-
----
-Answer from Perplexity: pplx.ai/share

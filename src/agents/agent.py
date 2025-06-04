@@ -2,61 +2,155 @@
 agent.py
 
 This module defines the base Agent class for implementing conversational agents
-that interact with Azure OpenAI services. It provides configuration for model
-selection, temperature, and system messages, and includes methods for
-initializing an authenticated Azure OpenAI client and creating chat completion
-requests.
+that interact with Azure OpenAI services via LangGraph workflows. This replaces
+direct Azure OpenAI API calls with LangGraph-based chat workflows while maintaining
+backward compatibility.
+
+MIGRATION NOTE: This module has been refactored to use LangGraph and LangChain's
+AzureChatOpenAI instead of direct openai.AzureOpenAI client usage. The interface
+remains the same for backward compatibility with existing code.
 
 Classes:
 ---------
 Agent
-    Base class for agent implementations, providing methods for system message
-    retrieval and chat completion creation using Azure OpenAI.
+    Base class for agent implementations, now using LangGraph workflows for
+    chat completion instead of direct Azure OpenAI API calls.
 
 Dependencies:
 -------------
 - os
 - typing (Dict, List)
-- openai
+- workflows.chat_graph (LangGraph implementation)
 - streamlit
-- azure.identity
 - streamlit.logger
 """
 
+import abc
 import os
-from typing import Any, Dict, Iterable, List
+from logging import getLogger
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
 
-import openai
-import streamlit as st
+import chainlit as cl
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
-from openai.types.chat import ChatCompletionMessageParam
-from streamlit.logger import get_logger
+from langchain.schema.runnable.config import RunnableConfig
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import Runnable
+from langchain_openai import AzureChatOpenAI
 
 load_dotenv()
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
 
-logger = get_logger(__name__)
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
+logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
-class Agent:
+@cl.cache
+def _create_llm(
+    azure_endpoint: str,
+    api_version: str,
+    azure_deployment: Optional[str],
+    temperature: Optional[float],
+    tag: Optional[str],
+) -> AzureChatOpenAI:
     """
-    Base class for agent implementations.
+    Create an instance of AzureChatOpenAI with Azure AD authentication.
 
-    Attributes:
-    -----------
-    agent_key : str
-        Unique identifier for the agent.
-    model : str
-        The model to use for this agent.
-    temperature : float
-        The temperature setting for response generation.
+    Args:
+        azure_endpoint (str): The Azure OpenAI service endpoint URL.
+        api_version (str): The API version to use for the Azure OpenAI service.
+        azure_deployment (Optional[str]): The name of the Azure OpenAI deployment.
+        temperature (Optional[float]): The sampling temperature to use for text generation.
+            Lower values make the output more deterministic.
+        tag (Optional[str]): An optional tag to associate with the LLM instance.
+
+    Returns:
+        AzureChatOpenAI: A configured instance of AzureChatOpenAI with streaming enabled
+            and Azure AD authentication.
+
+    Note:
+        This function uses DefaultAzureCredential for authentication, which attempts
+        multiple authentication methods in order (environment variables, managed identity,
+        Azure CLI, etc.).
+    """
+    # Use Azure identity for authentication
+    token_provider = get_bearer_token_provider(
+        DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+    )
+    logger.info(
+        "Creating AzureChatOpenAI instance with endpoint: %s, deployment: %s",
+        azure_endpoint,
+        azure_deployment,
+    )
+    return AzureChatOpenAI(
+        azure_endpoint=azure_endpoint,
+        api_version=api_version,
+        azure_ad_token_provider=token_provider,
+        azure_deployment=azure_deployment,
+        temperature=temperature,
+        streaming=True,
+        stream_usage=True,
+        tags=[tag] if tag else None,
+    )
+
+
+class Agent(abc.ABC):
+    """
+    This abstract base class provides a foundation for building conversational AI agents
+    that utilize LangGraph for workflow management and Azure OpenAI for language model
+    interactions. It handles the core infrastructure for message processing, chain creation,
+    and streaming responses.
+
+    The class has been migrated from direct OpenAI client usage to LangChain's AzureChatOpenAI
+    integration while maintaining backward compatibility with existing interfaces.
+
+    Attributes
+        Unique identifier for the agent instance.
+        The Azure OpenAI model deployment name to use for this agent.
+        Defaults to "gpt-4o" if not specified.
+        The temperature parameter for controlling response randomness.
+        Higher values (e.g., 1.0) make output more random, lower values (e.g., 0.0)
+        make it more deterministic. Defaults to 1.0 if not specified.
+    _llm : Optional[AzureChatOpenAI]
+        Private cached instance of the Azure OpenAI chat model.
+        Initialized lazily on first use.
+    _chain : Optional[Runnable]
+        Private cached instance of the compiled LangGraph chain.
+        Currently unused but reserved for future optimization.
+
+    Methods
+    create_chain() -> Runnable
+        Abstract method that must be implemented by subclasses to define
+        the agent's workflow as a LangGraph chain.
+    get_system_prompts() -> List[Dict[str, str]]
+        Abstract method that must be implemented by subclasses to provide
+        agent-specific system messages.
+    astream(messages, config) -> AsyncIterator[Any]
+        Asynchronously stream responses from the agent given a conversation history.
+
+    Examples
+    >>> class MyAgent(Agent):
+    ...     def create_chain(self):
+    ...         # Define custom workflow
+    ...         pass
+    ...     def get_system_prompts(self):
+    ...         return [{"role": "system", "content": "You are a helpful assistant."}]
+    >>>
+    >>> agent = MyAgent("my-agent", "gpt-4o", 0.7)
+    >>> async for chunk in agent.astream(messages, config):
+    ...     print(chunk)
+
+    - Subclasses must implement both `create_chain()` and `get_system_prompts()` methods.
+    - The agent relies on environment-configured Azure OpenAI credentials.
+    - Message format follows the standard OpenAI conversation structure with
+      'role' and 'content' keys.
     """
 
     def __init__(
-        self, agent_key: str, model: str = "gpt-4o", temperature: float = 1
+        self, agent_key: str, model: Optional[str], temperature: Optional[float]
     ) -> None:
         """
         Initialize an Agent with configurable settings.
@@ -73,8 +167,132 @@ class Agent:
         self.agent_key = agent_key
         self.model = model
         self.temperature = temperature
+        self._llm: Optional[AzureChatOpenAI] = None
+        self._chain: Optional[Runnable] = None
 
-    def get_system_messages(self) -> List[Dict[str, str]]:
+    def _get_azure_chat_openai(self, tag: Optional[str] = None) -> AzureChatOpenAI:
+        """
+        This method implements lazy initialization of the Azure OpenAI chat model.
+        If the instance doesn't exist, it creates one using the provided configuration
+        parameters and caches it for subsequent calls.
+
+        Parameters
+        ----------
+        tag : Optional[str], default=None
+            Optional tag to associate with the LLM instance for tracking or
+            identification purposes.
+
+        Returns
+        -------
+            Configured Azure OpenAI chat model instance. Returns the cached
+            instance if it already exists, otherwise creates a new one.
+
+        Notes
+        -----
+        The method uses the following instance attributes:
+        - `self.model`: The model name/identifier
+        - `self.temperature`: The temperature parameter for response generation
+        - `self._llm`: Cached LLM instance (private attribute)
+
+        The method also relies on the following module-level constants:
+        - `AZURE_OPENAI_ENDPOINT`: The Azure OpenAI service endpoint
+        - `AZURE_OPENAI_API_VERSION`: The API version to use
+        """
+
+        if self._llm is None:
+            self._llm = _create_llm(
+                AZURE_OPENAI_ENDPOINT,
+                AZURE_OPENAI_API_VERSION,
+                self.model,
+                self.temperature,
+                tag,
+            )
+
+        return self._llm
+
+    @abc.abstractmethod
+    def create_chain(self) -> Runnable:
+        """
+        Create and return a compiled state graph for this agent.
+
+        Returns:
+        --------
+        RunnableSerializable
+            An invocable chain.
+        """
+        pass
+
+    def _convert_to_langchain_messages(
+        self, messages: List[Dict[str, str]]
+    ) -> List[BaseMessage]:
+        """
+        Convert message dictionaries to LangChain message format.
+
+        Parameters:
+        -----------
+        messages : List[Dict[str, str]]
+            List of message dictionaries with 'role' and 'content' keys.
+
+        Returns:
+        --------
+        List[BaseMessage]
+            List of LangChain message objects.
+        """
+        langchain_messages = []
+
+        for message in messages:
+            role = message.get("role", "")
+            content = message.get("content", "")
+
+            if role == "system":
+                langchain_messages.append(SystemMessage(content=content))
+            elif role == "user":
+                langchain_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                langchain_messages.append(AIMessage(content=content))
+            else:
+                logger.warning(f"Unknown message role: {role}")
+                # Default to human message for unknown roles
+                langchain_messages.append(HumanMessage(content=content))
+
+        return langchain_messages
+
+    def astream(
+        self, messages: List[Dict[str, str]], config: RunnableConfig
+    ) -> AsyncIterator[Any]:
+        """
+        Stream responses asynchronously from the agent chain.
+        Args:
+            messages: List of message dictionaries containing conversation history.
+                Each dictionary should have 'role' and 'content' keys.
+            config: Configuration object for the runnable chain execution.
+        Returns:
+            AsyncIterator[Any]: An async iterator that yields streamed responses
+                from the agent chain.
+        Raises:
+            Exception: If the async LangGraph execution fails. The exception is
+                logged before being re-raised.
+        Note:
+            This method combines system prompts with user messages before streaming
+            through the created chain with message streaming mode enabled.
+        """
+        try:
+
+            # langchain_messages = self._convert_to_langchain_messages(messages)
+            chain = self.create_chain()
+            full_messages = self.get_system_prompts() + messages
+
+            return chain.astream(
+                {"messages": full_messages}, config=config, stream_mode="messages"
+            )
+        except Exception as e:
+            logger.exception(
+                "Async LangGraph execution failed, using fallback response: %s", e
+            )
+            raise e
+
+    @abc.abstractmethod
+    def get_system_prompts(self) -> List[Dict[str, str]]:
         """
         Get the system messages for this agent.
 
@@ -83,72 +301,4 @@ class Agent:
         List[Dict[str, str]]
             A list of system messages for the agent.
         """
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @staticmethod
-    @st.cache_resource
-    def get_client() -> openai.AzureOpenAI:
-        """
-        Get the Azure OpenAI client using DefaultAzureCredential.
-
-        Returns:
-        --------
-        openai.AzureOpenAI
-            An authenticated Azure OpenAI client.
-        """
-        token_provider = get_bearer_token_provider(
-            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-        )
-
-        return openai.AzureOpenAI(
-            azure_ad_token_provider=token_provider,
-            api_version=AZURE_OPENAI_API_VERSION,
-            azure_endpoint=AZURE_OPENAI_ENDPOINT,
-        )
-
-    @staticmethod
-    def format_messages(
-        messages: List[Dict[str, Any]],
-    ) -> Iterable[ChatCompletionMessageParam]:
-        """
-        Format messages to be compatible with OpenAI's ChatCompletionMessageParam type.
-
-        Args:
-            messages: A list of message dictionaries with 'role' and 'content' keys
-
-        Returns:
-            A list of properly formatted messages compatible with OpenAI's API
-        """
-        # The typing is handled by the ChatCompletionMessageParam, which will validate
-        # that the dictionaries have the correct structure
-        return [{"role": m["role"], "content": m["content"]} for m in messages]
-
-    def create_chat_completion(self, messages: List[Dict[str, str]]) -> openai.Stream:
-        """
-        Create and return a new chat completion request.
-
-        Parameters:
-        -----------
-        messages : List[ChatCompletionMessageParam]
-            List of message objects with role and content.
-
-        Returns:
-        --------
-        openai.Stream
-            A streaming response from Azure OpenAI.
-        """
-        client = self.get_client()
-
-        logger.debug(
-            "Creating chat completion for %d messages with model %s",
-            len(messages),
-            self.model,
-        )
-        # Create and return a new chat completion request
-        return client.chat.completions.create(
-            model=self.model,
-            messages=self.format_messages(messages),
-            stream=True,
-            stream_options={"include_usage": True},
-            temperature=self.temperature,
-        )
+        pass

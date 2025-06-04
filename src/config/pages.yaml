@@ -1,15 +1,14 @@
-# yaml-language-server: $schema=./pages.schema.json
+# yaml-language-server: $schema=./pages.v0.2.schema.json
 # Pages configuration for Discovery Cards Agent
 # This file defines all available pages in the application
 #
 # Structure:
 # - sections: Top-level sections in the navigation
 # - pages: Individual pages within each section
-#   - type: Type of page ("agent", "multiagent", etc.)
+#   - type: Type of page ("agent", etc.)
 #   - persona: Path to the persona prompt file (for agent type)
-#   - personas: List of persona prompt files (for multiagent type)
 #   - document: Path to the content document file (for agent type)
-#   - documents: List of document files (optional for multiagent type)
+#   - documents: List of document files (optional)
 #   - title: Page title displayed in the navigation
 #   - icon: Emoji icon for the page
 #   - url_path: URL path segment for the page
@@ -17,8 +16,19 @@
 #   - subtitle: Subtitle displayed below the header
 
 agents:
+  full_facilitator:
+    persona: prompts/facilitator_persona.md
+    documents:
+      - prompts/ai_discovery_cards.md
+      - prompts/design_thinking.md
+    model: gpt-4o
+    temperature: 1
   facilitator:
     persona: prompts/facilitator_persona.md
+    model: gpt-4o
+    temperature: 1
+  ai_discovery_expert:
+    persona: prompts/ai_discovery_expert_persona.md
     document: prompts/ai_discovery_cards.md
     model: o4-mini
     temperature: 1
@@ -37,16 +47,36 @@ agents:
     document: prompts/design_thinking.md
     model: o4-mini
     temperature: 1
-  multi_doc_expert:
-    persona: prompts/facilitator_persona.md
-    documents:
-      - prompts/ai_discovery_cards.md
-      - prompts/contoso_zermatt_national_bank.md
+  multi_agent:
+    condition: |
+      You are an agent that must analyze the user thread.
+      The user thread between long dashes (---) contains the conversation history:
+      ----------------------
+       {input} 
+      ----------------------
+
+      - When the conversation needs to go through a design thinking session return "design_thinking_expert".
+      - When it needs to cover any design thinking topic (like brainstorming, reverse brainstorming, customer journey, etc.) return "design_thinking_expert".
+      - For any question related to the cards, return "ai_discovery_expert".
+      - When you are in the step nr. 5 "Explore the AI Envisioning Cards", return "ai_discovery_expert".
+      - For anything about the workshop and the process, return "facilitator".
+      - In any other case, return "facilitator". 
+
+      Only answer with one of the words provided.
+      Your answer (design_thinking_expert/ai_discovery_expert/facilitator):
+    model: gpt-4.1-nano
+    agents:
+      - condition: design_thinking_expert
+        agent: design_thinking_expert
+      - condition: facilitator
+        agent: facilitator
+      - condition: ai_discovery_expert
+        agent: ai_discovery_expert
 
 sections:
   Coach:
     - type: agent
-      agent: facilitator
+      agent: full_facilitator
       title: Facilitator
       icon: 🧑‍🏫
       url_path: Facilitator
@@ -61,6 +91,14 @@ sections:
       header: 💡 AI Design Thinking Expert
       subtitle: I'm your AI Design Thinking Expert and can guide you through the Design Thinking process step by step.
       admin_only: true # Only visible to admins
+    - type: agent
+      agent: multi_agent
+      title: Multi Agent
+      icon: 🧪
+      url_path: MultiAgent
+      header: 🧪 AI Test Agent
+      subtitle: I'm a multi-agent that can help you as a facilitator and have access to the Design Thinking and AI Discovery Cards experts.
+      admin_only: true # Only visible to admins
   Customers:
     - type: agent
       agent: zermatt_national_bank
@@ -69,7 +107,6 @@ sections:
       url_path: ZermattNationalBank
       header: 🏦 Contoso Zermatt National Bank Representative
       subtitle: Ask me anything about our bank, internal processes and our day-to-day jobs.
-
     - type: agent
       agent: andermatt_works
       title: Andermatt Works
@@ -77,11 +114,3 @@ sections:
       url_path: AndermattWorks
       header: 🏗️ Contoso Andermatt Works Representative
       subtitle: Ask me anything about our construction company, internal processes and our day-to-day jobs.
-
-    # - type: agent
-    #   agent: multi_doc_expert
-    #   title: Multi-Doc Expert
-    #   icon: 📚
-    #   url_path: MultiDocExpert
-    #   header: 📚 Multi-Document Expert
-    #   subtitle: I'm grounded in multiple documents to demonstrate the multi-document capability.

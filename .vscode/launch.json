@@ -5,25 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Streamlit",
+            "name": "Python Debugger: Chainlit",
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}/src",
-            "module": "streamlit",
+            "module": "chainlit",
             "args": [
                 "run",
-                "streamlit_app.py",
-                "--server.port",
-                "8000",
-                "--server.address",
-                "0.0.0.0",
-                "--logger.level",
-                "debug",
-                "--client.showErrorDetails",
-                "full",
-                "--client.toolbarMode",
-                "developer"
-            ]
+                "--debug",
+                "-h",
+                "-w",
+                "chainlit_app.py",
+                "--port",
+                "8005",
+                "--host",
+                "0.0.0.0"
+            ],
+            "env": {
+                "LOGLEVEL": "DEBUG"
+            },
         }
     ]
 }

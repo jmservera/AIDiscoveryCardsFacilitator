@@ -11,15 +11,17 @@ credentials:
       first_name: John
       last_name: Doe
       logged_in: false
-      password: $2b$12$DOm8HmKD9xq49STJQbQpD./gZqmDuf3gx7jL2RhUnHFmcJg51jAA2
+      # Facilitator123$
+      password: $2b$12$TM7knFLshXORZU4yFzWLheS5yOGTCxpJLJc82D2OFUkAhKZRGnoSi
       roles:
-      - user
+        - user
     jsmith:
       email: jsmith@gmail.com
       failed_login_attempts: 0
       first_name: John
       last_name: Smith
       logged_in: true
-      password: $2b$12$kZg/2x3x2Arb2wQhee/pXOxNkahOWECQMQ/qw/7sGrkEcmRN7lkeK
+      # VibeCoding123$
+      password: $2b$12$TM7knFLshXORZU4yFzWLheW3wFg75boi32RXOLQlsyEKDaH00hHQ6
       roles:
-      - admin
+        - admin

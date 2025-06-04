@@ -1,12 +1,43 @@
 # AI Discovery Cards Facilitator
 
-This is a simple facilitator and a representative of a company for an AI Discovery Cards training. It runs on Streamlit and uses a simple authentication system.
+This is a simple facilitator and a representative of a company for an AI Discovery Cards training. It runs on [Chainlit](https://chainlit.io/).
+
+## Prerequisites
+
+- Python 3.12
+- Azure OpenAI account with deployed models
+- Git (for cloning the repository)
 
 ## Installation
 
-Rename the file [src/config/auth-config-example.yaml](src/config/auth-config-example.yaml) to `src/config/auth-config.yaml` and change the password. The username is `admin` and the password is `admin`. You can change it to whatever you want.
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd DiscoveryCardsAgent
+   ```
 
-Rename the file [src/config/pages-example.yaml](src/config/pages-example.yaml) to `src/config/pages.yaml` to use the example configuration, or customize it to your needs.
+2. **Install dependencies**:
+   ```bash
+   cd src
+   pip install -r requirements.txt
+   ```
+
+3. **Configure authentication**:
+   Rename the file [src/config/auth-config-example.yaml](src/config/auth-config-example.yaml) to `src/config/auth-config.yaml` and change the password. The username is `admin` and the password is `admin`. You can change it to whatever you want.
+
+4. **Configure pages and agents**:
+   Rename the file [src/config/pages-example.yaml](src/config/pages-example.yaml) to `src/config/pages.yaml` to use the example configuration, or customize it to your needs.
+
+5. **Set up environment variables**:
+   ```bash
+   export AZURE_OPENAI_ENDPOINT="your-azure-openai-endpoint"
+   export AZURE_OPENAI_API_VERSION="2024-02-01"
+   ```
+
+6. **Run the application**:
+   ```bash
+   chainlit run chainlit_app.py
+   ```
 
 ## Configuration
 
@@ -19,28 +50,53 @@ The `auth-config.yaml` file contains the user authentication settings. See the e
 The application uses a unified YAML configuration in `pages.yaml` that defines both agents and pages:
 
 1. **Agents**: Each agent has:
-   - A persona prompt file that defines its behavior
-   - One or more document files that provide grounding/context
+   - `persona`: Path to the persona prompt file that defines its behavior
+   - `document` or `documents`: One or more document files that provide grounding/context
+   - `model`: The AI model to use (e.g., "gpt-4o", "gpt-4o-mini")
+   - `temperature`: Temperature setting for response generation (0.0-2.0)
    
 2. **Pages**: Each page references an agent and defines:
    - Navigation properties (title, icon, URL path)
    - Display properties (header, subtitle)
    - Access control (admin_only flag)
 
-### Multiple Document Support
+### Agent Configuration Options
 
-Agents can now be grounded in multiple documents:
+**Single Agent Configuration**:
+```yaml
+agents:
+  my_agent:
+    persona: prompts/my_persona.md
+    document: prompts/my_document.md  # Single document
+    model: gpt-4o
+    temperature: 0.7
+```
 
+**Multi-Document Agent Configuration**:
 ```yaml
 agents:
   multi_doc_expert:
     persona: prompts/facilitator_persona.md
-    documents:
+    documents:  # Multiple documents
       - prompts/first_document.md 
       - prompts/second_document.md
+    model: gpt-4o-mini
+    temperature: 1.0
 ```
 
-This allows creating more capable agents with access to multiple knowledge sources.
+**Graph Agent Configuration** (for conditional routing):
+```yaml
+agents:
+  routing_agent:
+    condition: "Analyze the input and decide which agent to route to"
+    agents:
+      - agent: "expert_agent"
+        condition: "expert"
+      - agent: "basic_agent" 
+        condition: "basic"
+    model: gpt-4o
+    temperature: 0.5
+```
 
 ## Mermaid Diagram Support
 
