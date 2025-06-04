@@ -25,7 +25,8 @@ Note: The application expects the configuration files in the same directory with
 format.
 """
 
-from logging import getLogger
+import os
+from logging import basicConfig, getLogger
 from typing import Any, Dict, List, Optional
 
 import bcrypt
@@ -39,6 +40,9 @@ from agents import agent_registry
 
 AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 PAGES_CONFIG_FILE = "./config/pages.yaml"
+
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
+basicConfig(level=LOGLEVEL, format="%(asctime)s %(message)s")
 
 logger = getLogger(__name__)
 

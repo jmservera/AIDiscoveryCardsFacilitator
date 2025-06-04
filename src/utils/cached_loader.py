@@ -53,7 +53,7 @@ def load_prompt_files(
     # Read the persona file
     with open(persona_file_path, "r", encoding="utf-8") as f:
         system_prompt = f.read()
-    logger.debug("Adding guardrails to system prompt")
+    logger.info("Adding guardrails to system prompt")
     # Add security instructions to the system prompt
     with open("prompts/guardrails.md", "r", encoding="utf-8") as f:
         system_prompt += f.read()

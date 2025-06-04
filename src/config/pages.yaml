@@ -16,6 +16,13 @@
 #   - subtitle: Subtitle displayed below the header
 
 agents:
+  full_facilitator:
+    persona: prompts/facilitator_persona.md
+    documents:
+      - prompts/ai_discovery_cards.md
+      - prompts/design_thinking.md
+    model: gpt-4o
+    temperature: 1
   facilitator:
     persona: prompts/facilitator_persona.md
     model: gpt-4o
@@ -43,14 +50,17 @@ agents:
   multi_agent:
     condition: |
       You are an agent that must analyze the user thread.
-      User thread :
-      ---
+      The user thread between long dashes (---) contains the conversation history:
+      ----------------------
        {input} 
-      ---
+      ----------------------
 
-      - When the conversation needs to go through a design thinking session, or it needs to cover any design thinking topic (like brainstorming, reverse brainstorming, customer journey, etc.) return "design_thinking_expert".
-      - When you are in the step nr. 5 "Explore the AI Envisioning Cards" or for any question related to the cards, return "ai_discovery_expert".
-      - In any other case, or if there's any doubt not related to the previous topics return "facilitator", as it's the one who knows all the steps and can guide the user through the process.
+      - When the conversation needs to go through a design thinking session return "design_thinking_expert".
+      - When it needs to cover any design thinking topic (like brainstorming, reverse brainstorming, customer journey, etc.) return "design_thinking_expert".
+      - For any question related to the cards, return "ai_discovery_expert".
+      - When you are in the step nr. 5 "Explore the AI Envisioning Cards", return "ai_discovery_expert".
+      - For anything about the workshop and the process, return "facilitator".
+      - In any other case, return "facilitator". 
 
       Only answer with one of the words provided.
       Your answer (design_thinking_expert/ai_discovery_expert/facilitator):
@@ -66,7 +76,7 @@ agents:
 sections:
   Coach:
     - type: agent
-      agent: facilitator
+      agent: full_facilitator
       title: Facilitator
       icon: 🧑‍🏫
       url_path: Facilitator
