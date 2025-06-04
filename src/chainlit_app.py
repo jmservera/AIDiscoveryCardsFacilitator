@@ -76,7 +76,7 @@ class ChainlitAgentManager:
                 self.pages_config = yaml.load(file, Loader=SafeLoader)
             self.agents_config = self.pages_config.get("agents", {})
         except (yaml.YAMLError, FileNotFoundError) as e:
-            cl.logger.error(f"Error loading pages configuration: {e}")
+            logger.error(f"Error loading pages configuration: {e}")
             self.agents_config = {}
             self.pages_config = {}
 
@@ -232,7 +232,7 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
                         },
                     )
     except Exception as e:
-        cl.logger.error(f"Authentication error: {e}")
+        logger.error(f"Authentication error: {e}")
 
     return None
 
@@ -526,7 +526,7 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
         #     ).send()
 
     except Exception as e:
-        cl.logger.error(f"Error processing with agent {agent_key}: {e}")
+        logger.error(f"Error processing with agent {agent_key}: {e}")
         await cl.Message(content=f"❌ Error processing your message: {str(e)}").send()
 
 
