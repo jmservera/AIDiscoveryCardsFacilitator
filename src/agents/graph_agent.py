@@ -19,6 +19,7 @@ Dependencies:
 - langgraph: For state graph workflow construction
 """
 
+import os
 from logging import getLogger
 from typing import Any, Dict, List, Optional, Sequence, TypedDict
 
@@ -31,7 +32,9 @@ from typing_extensions import Annotated
 
 from .agent import Agent
 
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
 class AgentState(TypedDict):

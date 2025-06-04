@@ -10,12 +10,15 @@ Functions:
 load_prompt_files : Cached function to load persona and document files
 """
 
+import os
 from logging import getLogger
 from typing import Dict, List, Optional, Union
 
 import chainlit as cl
 
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
 @cl.cache

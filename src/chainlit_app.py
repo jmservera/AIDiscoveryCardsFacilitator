@@ -42,9 +42,8 @@ AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 PAGES_CONFIG_FILE = "./config/pages.yaml"
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
-basicConfig(level=LOGLEVEL, format="%(asctime)s %(message)s")
-
 logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
 class ChainlitAgentManager:
@@ -413,7 +412,7 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
         msg = cl.Message(content="")
         # Show typing indicator
         # async with cl.Step(name="🤔 Thinking...") as step:
-        with cl.Step(name="🤔 Thinking...") as step:
+        with cl.Step(name=agent_key) as step:
             # Process the message with the agent
             step.input = content
             async for chunk in agent.astream(

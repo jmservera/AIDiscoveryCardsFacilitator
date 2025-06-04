@@ -10,6 +10,7 @@ Classes:
 - SingleAgent: Implements a single agent with persona and document-based system message loading.
 """
 
+import os
 from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
@@ -26,7 +27,9 @@ from utils.cached_loader import load_prompt_files
 
 from .agent import Agent
 
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
 class ChatState(TypedDict):

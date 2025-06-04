@@ -20,6 +20,7 @@ agent_registry:
     A singleton instance of the AgentRegistry class for global use.
 """
 
+import os
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, Optional
@@ -33,7 +34,9 @@ from .single_agent import SingleAgent
 PAGES_FILE = Path(__file__).parent.parent / "config/pages.yaml"
 
 
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 logger = getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 
 class AgentRegistry:
