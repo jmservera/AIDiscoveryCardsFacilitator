@@ -36,7 +36,7 @@ from chainlit.types import ThreadDict
 from langchain.schema.runnable.config import RunnableConfig
 from yaml.loader import SafeLoader
 
-from agents import agent_registry
+from agents import RESPONSE_TAG, agent_registry
 
 AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 PAGES_CONFIG_FILE = "./config/pages.yaml"
@@ -426,7 +426,7 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
                     if (
                         metadata
                         and "tags" in metadata
-                        and "response" in metadata["tags"]
+                        and RESPONSE_TAG in metadata["tags"]
                     ):
                         # Handle agent response chunk
                         response = message.content
