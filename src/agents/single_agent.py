@@ -12,7 +12,7 @@ Classes:
 
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -53,7 +53,7 @@ class SingleAgent(Agent):
         persona: str,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        documents: Optional[Union[str, List[str]]] = None,
+        documents: Optional[Union[str, frozenset[str]]] = None,
     ) -> None:
         """
         Initialize a SingleAgent with a specific persona.

@@ -121,7 +121,7 @@ class AgentRegistry:
                 if "document" in agent_config:
                     documents = agent_config["document"]
                 elif "documents" in agent_config:
-                    documents = agent_config["documents"]
+                    documents = frozenset(agent_config["documents"])
 
                 logger.info(
                     "Creating SingleAgent for key '%s' with model '%s'",

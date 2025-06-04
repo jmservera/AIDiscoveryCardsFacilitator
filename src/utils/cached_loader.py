@@ -2,7 +2,7 @@
 Cached prompt file loader utility.
 
 This module provides caching functionality for loading prompt files and creating
-initial message structures for AI agents. It uses Streamlit's caching mechanism
+initial message structures for AI agents. It uses Chainlit's caching mechanism
 to optimize file loading performance.
 
 Functions:
@@ -13,14 +13,22 @@ load_prompt_files : Cached function to load persona and document files
 from logging import getLogger
 from typing import Dict, List, Optional, Union
 
+import chainlit as cl
+
 logger = getLogger(__name__)
 
 
+@cl.cache
 def load_prompt_files(
-    persona_file_path: str, content_file_paths: Optional[Union[str, List[str]]] = None
+    persona_file_path: str,
+    content_file_paths: Optional[Union[str, frozenset[str]]] = None,
 ) -> List[Dict[str, str]]:
     """
-    Load content from prompt files and create initial messages.
+    Cached function to load content from prompt files and create initial messages.
+
+    This function uses Chainlit's caching mechanism to avoid reloading files
+    on every function call. The cache persists for the duration of the session
+    and significantly improves performance when repeatedly accessing the same files.
 
     This function reads a persona file and optional content files to create
     a list of system messages. It automatically adds guardrails from the
@@ -30,9 +38,11 @@ def load_prompt_files(
     -----------
     persona_file_path : str
         Path to the persona/system prompt file.
-    content_file_paths : Optional[Union[str, List[str]]], optional
+    content_file_paths : Optional[Union[str, frozenset[str]]], optional
         Path to a single content/context file, or a list of file paths.
         If None, only the persona prompt will be loaded.
+        It is important that the list is frozen to ensure immutability
+        and proper caching behavior.
 
     Returns:
     --------
