@@ -27,23 +27,52 @@ Dependencies:
 
 import abc
 import os
-from typing import Any, Dict, Iterator, List, Optional
+from logging import getLogger
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
 
+import chainlit as cl
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
+from langchain.schema.runnable.config import RunnableConfig
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from langchain_openai import AzureChatOpenAI
-from streamlit.logger import get_logger
-
-from utils.streamlit_context import with_streamlit_context
 
 load_dotenv()
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
 
-logger = get_logger(__name__)
+logger = getLogger(__name__)
+
+
+@cl.cache
+def _create_llm(
+    azure_endpoint: str,
+    api_version: str,
+    azure_deployment: Optional[str],
+    temperature: Optional[float],
+    tag: Optional[str],
+) -> AzureChatOpenAI:
+    # Use Azure identity for authentication
+    token_provider = get_bearer_token_provider(
+        DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+    )
+    logger.info(
+        "Creating AzureChatOpenAI instance with endpoint: %s, deployment: %s",
+        azure_endpoint,
+        azure_deployment,
+    )
+    return AzureChatOpenAI(
+        azure_endpoint=azure_endpoint,
+        api_version=api_version,
+        azure_ad_token_provider=token_provider,
+        azure_deployment=azure_deployment,
+        temperature=temperature,
+        streaming=True,
+        stream_usage=True,
+        tags=[tag] if tag else None,
+    )
 
 
 class Agent(abc.ABC):
@@ -94,21 +123,14 @@ class Agent(abc.ABC):
         AzureChatOpenAI
             Configured Azure OpenAI chat model instance.
         """
-        if self._llm is None:
-            # Use Azure identity for authentication
-            token_provider = get_bearer_token_provider(
-                DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-            )
 
-            self._llm = AzureChatOpenAI(
-                azure_endpoint=AZURE_OPENAI_ENDPOINT,
-                api_version=AZURE_OPENAI_API_VERSION,
-                azure_ad_token_provider=token_provider,
-                azure_deployment=self.model,
-                temperature=self.temperature,
-                streaming=True,
-                stream_usage=True,
-                tags=[tag] if tag else None,
+        if self._llm is None:
+            self._llm = _create_llm(
+                AZURE_OPENAI_ENDPOINT,
+                AZURE_OPENAI_API_VERSION,
+                self.model,
+                self.temperature,
+                tag,
             )
 
         return self._llm
@@ -160,61 +182,23 @@ class Agent(abc.ABC):
 
         return langchain_messages
 
-    def create_chat_completion(self, messages: List[Dict[str, str]]) -> Iterator[Any]:
-        """
-        Create and return a new chat completion request using LangGraph workflow.
-
-        Parameters:
-        -----------
-        messages : List[Dict[str, str]]
-            List of message objects with role and content.
-
-        Yields:
-        -------
-        Iterator[Any]
-            An streaming response compatible with LangChain format.
-        """
-        logger.debug(
-            "Creating LangGraph chat completion for %d messages with model %s",
-            len(messages),
-            self.model,
-        )
+    def astream(
+        self, messages: List[Dict[str, str]], config: RunnableConfig
+    ) -> AsyncIterator[Any]:
         try:
 
             # langchain_messages = self._convert_to_langchain_messages(messages)
             chain = self.create_chain()
             full_messages = self.get_system_prompts() + messages
 
-            for chunk in chain.stream(
-                {"messages": full_messages}, stream_mode="messages"
-            ):
-                yield chunk
-
+            return chain.astream(
+                {"messages": full_messages}, config=config, stream_mode="messages"
+            )
         except Exception as e:
             logger.exception(
-                "LangGraph execution failed, using fallback response: {e}", e
+                "Async LangGraph execution failed, using fallback response: %s", e
             )
-            fallback_content = (
-                "This is a mock response due to Azure authentication failure."
-            )
-
-            # Fallback to mock response when Azure authentication fails
-            class MockChunk:
-                def __init__(self, content: str):
-                    self.content = content
-
-            yield MockChunk(content=fallback_content)
-
-            class FinalChunk:
-                def __init__(self, content: str):
-                    self.content = ""
-                    self.usage_metadata = {
-                        "output_tokens": len(content.split()) if content else 0,
-                        "input_tokens": 50,  # Estimate
-                        "total_tokens": len(content.split()) + 50 if content else 50,
-                    }
-
-            yield FinalChunk(fallback_content)
+            raise e
 
     @abc.abstractmethod
     def get_system_prompts(self) -> List[Dict[str, str]]:

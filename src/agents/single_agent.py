@@ -10,8 +10,9 @@ Classes:
 - SingleAgent: Implements a single agent with persona and document-based system message loading.
 """
 
+from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -19,14 +20,13 @@ from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
-from streamlit.logger import get_logger
 from typing_extensions import Annotated, TypedDict
 
 from utils.cached_loader import load_prompt_files
 
 from .agent import Agent
 
-logger = get_logger(__name__)
+logger = getLogger(__name__)
 
 
 class ChatState(TypedDict):
@@ -53,7 +53,7 @@ class SingleAgent(Agent):
         persona: str,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        documents: Optional[Union[str, List[str]]] = None,
+        documents: Optional[Union[str, frozenset[str]]] = None,
     ) -> None:
         """
         Initialize a SingleAgent with a specific persona.

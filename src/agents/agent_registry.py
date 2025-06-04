@@ -20,11 +20,11 @@ agent_registry:
     A singleton instance of the AgentRegistry class for global use.
 """
 
+from logging import getLogger
 from pathlib import Path
 from typing import Dict, Optional
 
 import yaml
-from streamlit.logger import get_logger
 
 from .agent import Agent
 from .graph_agent import GraphAgent
@@ -33,7 +33,7 @@ from .single_agent import SingleAgent
 PAGES_FILE = Path(__file__).parent.parent / "config/pages.yaml"
 
 
-logger = get_logger(__name__)
+logger = getLogger(__name__)
 
 
 class AgentRegistry:
@@ -121,7 +121,7 @@ class AgentRegistry:
                 if "document" in agent_config:
                     documents = agent_config["document"]
                 elif "documents" in agent_config:
-                    documents = agent_config["documents"]
+                    documents = frozenset(agent_config["documents"])
 
                 logger.info(
                     "Creating SingleAgent for key '%s' with model '%s'",

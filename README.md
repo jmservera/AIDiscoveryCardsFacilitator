@@ -1,6 +1,6 @@
 # AI Discovery Cards Facilitator
 
-This is a simple facilitator and a representative of a company for an AI Discovery Cards training. It runs on Streamlit and uses a simple authentication system.
+This is a simple facilitator and a representative of a company for an AI Discovery Cards training. It runs on [Chainlit](https://chainlit.io/).
 
 ## Installation
 
