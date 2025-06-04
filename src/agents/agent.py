@@ -54,6 +54,26 @@ def _create_llm(
     temperature: Optional[float],
     tag: Optional[str],
 ) -> AzureChatOpenAI:
+    """
+    Create an instance of AzureChatOpenAI with Azure AD authentication.
+
+    Args:
+        azure_endpoint (str): The Azure OpenAI service endpoint URL.
+        api_version (str): The API version to use for the Azure OpenAI service.
+        azure_deployment (Optional[str]): The name of the Azure OpenAI deployment.
+        temperature (Optional[float]): The sampling temperature to use for text generation.
+            Lower values make the output more deterministic.
+        tag (Optional[str]): An optional tag to associate with the LLM instance.
+
+    Returns:
+        AzureChatOpenAI: A configured instance of AzureChatOpenAI with streaming enabled
+            and Azure AD authentication.
+
+    Note:
+        This function uses DefaultAzureCredential for authentication, which attempts
+        multiple authentication methods in order (environment variables, managed identity,
+        Azure CLI, etc.).
+    """
     # Use Azure identity for authentication
     token_provider = get_bearer_token_provider(
         DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
@@ -77,20 +97,54 @@ def _create_llm(
 
 class Agent(abc.ABC):
     """
-    Base class for agent implementations using LangGraph workflows.
+    This abstract base class provides a foundation for building conversational AI agents
+    that utilize LangGraph for workflow management and Azure OpenAI for language model
+    interactions. It handles the core infrastructure for message processing, chain creation,
+    and streaming responses.
 
-    MIGRATION NOTE: This class now uses LangGraph and LangChain's AzureChatOpenAI
-    for interacting with Azure OpenAI, replacing direct openai.AzureOpenAI client usage.
-    The interface remains the same for backward compatibility.
+    The class has been migrated from direct OpenAI client usage to LangChain's AzureChatOpenAI
+    integration while maintaining backward compatibility with existing interfaces.
 
-    Attributes:
-    -----------
-    agent_key : str
-        Unique identifier for the agent.
-    model : str
-        The model to use for this agent. Defaults to "gpt-4o".
-    temperature : float
-        The temperature setting for response generation.
+    Attributes
+        Unique identifier for the agent instance.
+        The Azure OpenAI model deployment name to use for this agent.
+        Defaults to "gpt-4o" if not specified.
+        The temperature parameter for controlling response randomness.
+        Higher values (e.g., 1.0) make output more random, lower values (e.g., 0.0)
+        make it more deterministic. Defaults to 1.0 if not specified.
+    _llm : Optional[AzureChatOpenAI]
+        Private cached instance of the Azure OpenAI chat model.
+        Initialized lazily on first use.
+    _chain : Optional[Runnable]
+        Private cached instance of the compiled LangGraph chain.
+        Currently unused but reserved for future optimization.
+
+    Methods
+    create_chain() -> Runnable
+        Abstract method that must be implemented by subclasses to define
+        the agent's workflow as a LangGraph chain.
+    get_system_prompts() -> List[Dict[str, str]]
+        Abstract method that must be implemented by subclasses to provide
+        agent-specific system messages.
+    astream(messages, config) -> AsyncIterator[Any]
+        Asynchronously stream responses from the agent given a conversation history.
+
+    Examples
+    >>> class MyAgent(Agent):
+    ...     def create_chain(self):
+    ...         # Define custom workflow
+    ...         pass
+    ...     def get_system_prompts(self):
+    ...         return [{"role": "system", "content": "You are a helpful assistant."}]
+    >>>
+    >>> agent = MyAgent("my-agent", "gpt-4o", 0.7)
+    >>> async for chunk in agent.astream(messages, config):
+    ...     print(chunk)
+
+    - Subclasses must implement both `create_chain()` and `get_system_prompts()` methods.
+    - The agent relies on environment-configured Azure OpenAI credentials.
+    - Message format follows the standard OpenAI conversation structure with
+      'role' and 'content' keys.
     """
 
     def __init__(
@@ -116,12 +170,31 @@ class Agent(abc.ABC):
 
     def _get_azure_chat_openai(self, tag: Optional[str] = None) -> AzureChatOpenAI:
         """
-        Create and return an AzureChatOpenAI instance with authentication.
+        This method implements lazy initialization of the Azure OpenAI chat model.
+        If the instance doesn't exist, it creates one using the provided configuration
+        parameters and caches it for subsequent calls.
 
-        Returns:
-        --------
-        AzureChatOpenAI
-            Configured Azure OpenAI chat model instance.
+        Parameters
+        ----------
+        tag : Optional[str], default=None
+            Optional tag to associate with the LLM instance for tracking or
+            identification purposes.
+
+        Returns
+        -------
+            Configured Azure OpenAI chat model instance. Returns the cached
+            instance if it already exists, otherwise creates a new one.
+
+        Notes
+        -----
+        The method uses the following instance attributes:
+        - `self.model`: The model name/identifier
+        - `self.temperature`: The temperature parameter for response generation
+        - `self._llm`: Cached LLM instance (private attribute)
+
+        The method also relies on the following module-level constants:
+        - `AZURE_OPENAI_ENDPOINT`: The Azure OpenAI service endpoint
+        - `AZURE_OPENAI_API_VERSION`: The API version to use
         """
 
         if self._llm is None:
@@ -185,6 +258,22 @@ class Agent(abc.ABC):
     def astream(
         self, messages: List[Dict[str, str]], config: RunnableConfig
     ) -> AsyncIterator[Any]:
+        """
+        Stream responses asynchronously from the agent chain.
+        Args:
+            messages: List of message dictionaries containing conversation history.
+                Each dictionary should have 'role' and 'content' keys.
+            config: Configuration object for the runnable chain execution.
+        Returns:
+            AsyncIterator[Any]: An async iterator that yields streamed responses
+                from the agent chain.
+        Raises:
+            Exception: If the async LangGraph execution fails. The exception is
+                logged before being re-raised.
+        Note:
+            This method combines system prompts with user messages before streaming
+            through the created chain with message streaming mode enabled.
+        """
         try:
 
             # langchain_messages = self._convert_to_langchain_messages(messages)

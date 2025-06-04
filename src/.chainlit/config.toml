@@ -42,7 +42,7 @@ sample_rate = 44100
 
 [UI]
 # Name of the app and chatbot.
-name = "AI Discovery Cards Agent"
+name = "AI Discovery Cards Agents"
 
 # Show the readme while the conversation is empty.
 show_readme_as_default = true
