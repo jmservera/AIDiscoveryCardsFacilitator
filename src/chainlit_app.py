@@ -46,6 +46,7 @@ AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 
 dotenv.load_dotenv()
 
+
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
 logger = getLogger(__name__)
 logger.setLevel(LOGLEVEL)
@@ -150,6 +151,25 @@ async def auth_callback(username: str, password: str) -> Optional[cl.User]:
     return None
 
 
+@cl.set_chat_profiles
+async def chat_profile(user: Optional[cl.User] = None) -> List[cl.ChatProfile]:
+
+    profiles: List[cl.ChatProfile] = []
+
+    if user:
+        user_roles = user.metadata.get("roles", ["user"])
+        available_agents = agent_manager.get_available_agents(user_roles)
+        for agent_key, agent_info in available_agents.items():
+            profiles.append(
+                cl.ChatProfile(
+                    name=agent_info["header"],
+                    markdown_description=agent_info["subtitle"],
+                    default=agent_info.get("default", False)
+                )
+            )
+    return profiles
+
+
 @cl.on_chat_start
 async def start() -> None:
     """Initialize the chat session when a user connects."""
@@ -158,56 +178,34 @@ async def start() -> None:
         await cl.Message(content="❌ Authentication required. Please log in.").send()
         return
 
+    await cl.Message(
+        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n").send()
+
     user_roles = user.metadata.get("roles", ["user"])
     available_agents = agent_manager.get_available_agents(user_roles)
-
     if not available_agents:
         await cl.Message(content="❌ No agents available for your user role.").send()
         return
-
-    # Create agent selection message
-    agent_list = []
-    current: Optional[str] = None
-    for agent_key, agent_info in available_agents.items():
-        is_default = agent_info.get("default", False)
-        if is_default:
-            # Set default agent if specified
-            cl.user_session.set("current_agent", agent_key)
-            current = agent_info["title"]
-        agent_list.append(
-            f"{agent_info['icon']} **{agent_info['title']}** (`{agent_key}`) {'[*default*] ' if is_default else ''}- {agent_info['subtitle']}"
-        )
-
-    start_instruction = (
-        "*Choose an agent to begin your AI Discovery Cards experience!*"
-        if current is None
-        else f"*Choose an agent or start chatting with the current agent:* **{current}**"
-    )
-    welcome_message = f"""
-# 🤖 Welcome to AI Discovery Cards Agent
-
-Hello **{user.metadata.get('first_name', user.identifier)}**! 
-
-## Available Agents:
-
-{chr(10).join(agent_list)}
-
-## Getting Started:
-
-To switch to an agent, type: `/switch <agent_key>`
-
-For example: `/switch facilitator`
-
-You can also type `/help` for more commands or `/list` to see available agents.
-
----
-{start_instruction}
-"""
-
-    await cl.Message(content=welcome_message).send()
-
-    # Store available agents in session
     cl.user_session.set("available_agents", available_agents)
+
+    chat_profile = cl.user_session.get("chat_profile")
+    current_agent_key = None
+    if chat_profile:
+        for agent_key, agent_info in available_agents.items():
+            if agent_info.get("header") == chat_profile:
+                current_agent_key = agent_key
+                await cl.Message(
+                    content=f"## {agent_info['header']}.\n\n{agent_info['subtitle']}"
+                ).send()
+                break
+    if not current_agent_key:
+        # If no current agent is set, default to the first available agent
+        if available_agents:
+            current_agent_key = next(iter(available_agents.keys()))
+        else:
+            await cl.Message(content="❌ No agents available.").send()
+            return
+    cl.user_session.set("current_agent_key", current_agent_key)
 
 
 @cl.on_message
@@ -220,129 +218,14 @@ async def main(message: cl.Message) -> None:
 
     content = message.content.strip()
 
-    # Handle commands
-    if content.startswith("/"):
-        await handle_command(content, user)
-        return
-
-    # Check if an agent is selected
-    current_agent_key = cl.user_session.get("current_agent")
+    current_agent_key = cl.user_session.get("current_agent_key")
     if not current_agent_key:
         await cl.Message(
-            content="❌ No agent selected. Please use `/switch <agent_key>` to select an agent first.\n\nType `/list` to see available agents."
+            content="❌ No agent selected. Please select an agent to continue."
         ).send()
         return
-
     # Process message with current agent
     await process_with_agent(content, current_agent_key, user)
-
-
-async def handle_command(command: str, user: cl.User) -> None:
-    """
-    Handle chat commands.
-
-    Parameters:
-    -----------
-    command : str
-        The command string starting with '/'
-    user : cl.User
-        The current user
-    """
-    parts = command[1:].split()
-    cmd = parts[0].lower() if parts else ""
-
-    available_agents: Dict[str, Dict[str, Any]] = (
-        cl.user_session.get("available_agents", {}) or {}
-    )
-
-    if cmd == "help":
-        help_text = """
-## 🆘 Available Commands:
-
-- `/switch <agent_key>` - Switch to a specific agent
-- `/list` - Show all available agents  
-- `/current` - Show current active agent
-- `/help` - Show this help message
-- `/clear` - Clear chat history
-
-## 💡 Tips:
-
-- Each agent has unique expertise and knowledge
-- You can switch between agents anytime during your conversation
-- Admin users have access to additional agents
-"""
-        await cl.Message(content=help_text).send()
-
-    elif cmd == "list":
-        if not available_agents:
-            await cl.Message(content="❌ No agents available.").send()
-            return
-
-        agent_list = []
-        for agent_key, agent_info in available_agents.items():
-            status = (
-                "🟢 **ACTIVE**"
-                if cl.user_session.get("current_agent") == agent_key
-                else "⚪"
-            )
-            agent_list.append(
-                f"{status} {agent_info['icon']} **{agent_info['title']}** (`{agent_key}`)\n   _{agent_info['subtitle']}_"
-            )
-
-        message_content = f"## 🤖 Available Agents:\n\n{chr(10).join(agent_list)}\n\nUse `/switch <agent_key>` to activate an agent."
-        await cl.Message(content=message_content).send()
-
-    elif cmd == "switch":
-        if len(parts) < 2:
-            await cl.Message(
-                content="❌ Usage: `/switch <agent_key>`\n\nType `/list` to see available agents."
-            ).send()
-            return
-
-        agent_key = parts[1]
-        if agent_key not in available_agents:
-            await cl.Message(
-                content=f"❌ Agent '{agent_key}' not found.\n\nType `/list` to see available agents."
-            ).send()
-            return
-
-        # Switch to the agent
-        cl.user_session.set("current_agent", agent_key)
-        agent_info = available_agents[agent_key]
-
-        switch_message = f"""
-## {agent_info['icon']} Switched to {agent_info['title']}
-
-{agent_info['subtitle']}
-
----
-You can now start chatting with this agent. Type `/help` for more commands.
-"""
-        await cl.Message(content=switch_message).send()
-
-    elif cmd == "current":
-        current_agent_key = cl.user_session.get("current_agent")
-        if not current_agent_key:
-            await cl.Message(
-                content="❌ No agent currently selected. Use `/switch <agent_key>` to select one."
-            ).send()
-        else:
-            agent_info = available_agents.get(current_agent_key, {})
-            current_message = f"## 🟢 Current Agent: {agent_info.get('icon', '🤖')} {agent_info.get('title', current_agent_key)}"
-            await cl.Message(content=current_message).send()
-
-    elif cmd == "clear":
-        # Clear the chat history
-        # Note: In Chainlit, we can't directly clear the UI, but we can reset session state
-        cl.user_session.set("current_agent", None)
-        await cl.Message(
-            content="🧹 Chat history cleared. Select an agent to continue."
-        ).send()
-
-    else:
-        await cl.Message(
-            content=f"❌ Unknown command: `/{cmd}`\n\nType `/help` for available commands."
-        ).send()
 
 
 async def process_with_agent(content: str, agent_key: str, user: cl.User) -> None:

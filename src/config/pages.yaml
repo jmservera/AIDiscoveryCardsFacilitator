@@ -97,7 +97,7 @@ sections:
       title: Multi Agent
       icon: 🧪
       url_path: MultiAgent
-      header: 🧪 AI Test Agent
+      header: 🧪 AI Multi Agent
       subtitle: I'm a multi-agent that can help you as a facilitator and have access to the Design Thinking and AI Discovery Cards experts.
       admin_only: true # Only visible to admins
   Customers:
