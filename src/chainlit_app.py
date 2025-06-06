@@ -40,6 +40,7 @@ from yaml.loader import SafeLoader
 from agent_manager import ChainlitAgentManager
 
 from agents import RESPONSE_TAG, agent_registry
+from utils.mermaid import extract_mermaid
 
 AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 
@@ -198,6 +199,7 @@ async def start() -> None:
                     content=f"## {agent_info['header']}.\n\n{agent_info['subtitle']}"
                 ).send()
                 break
+
     if not current_agent_key:
         # If no current agent is set, default to the first available agent
         if available_agents:
@@ -205,6 +207,7 @@ async def start() -> None:
         else:
             await cl.Message(content="❌ No agents available.").send()
             return
+    # Set the current agent key in user session
     cl.user_session.set("current_agent_key", current_agent_key)
 
 
@@ -305,15 +308,24 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
                         step.output = cb.usage_metadata
                     if response:
                         step.output = "Generating response..."
-                        await step.stream_token(response)
                         await msg.stream_token(response)
                 step.output = cb.usage_metadata
                 await step.send()
-        await msg.send()
 
         response = msg.content.strip() if msg.content else None
-        # Add assistant response to history
+        # check if any mermaid tags are present in the response and extract the code
+        # there may be multiple mermaid code blocks, so create a list of them
         if response:
+            mermaid_codes = extract_mermaid(response)
+            # If mermaid codes are found, send them as separate messages
+            if mermaid_codes:
+                msg.elements = list(
+                    map(lambda code: cl.CustomElement(
+                        name="MermaidViewer", props={"code": code}), mermaid_codes)
+                )
+
+            await msg.send()
+            # Add assistant response to history
             history.append({"role": "assistant", "content": response})
             cl.user_session.set("conversation_history", history)
 
@@ -328,16 +340,16 @@ async def on_chat_resume(thread: ThreadDict) -> None:
     user = cl.user_session.get("user")
     if user:
         user_roles = user.metadata.get("roles", ["user"])
-        available_agents = agent_manager.get_available_agents(user_roles)
+        available_agents = agent_manager.get_available_agents(
+            user_roles)
         cl.user_session.set("available_agents", available_agents)
 
-        # Restore conversation history if available
-        metadata = thread.get("metadata", {})
-        if metadata and "conversation_history" in metadata:
-            cl.user_session.set(
-                "conversation_history", metadata["conversation_history"]
-            )
-
+    # Restore conversation history if available
+    metadata = thread.get("metadata", {})
+    if metadata and "conversation_history" in metadata:
+        cl.user_session.set(
+            "conversation_history", metadata["conversation_history"]
+        )
 
 if __name__ == "__main__":
     cl.run()
