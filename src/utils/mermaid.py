@@ -18,7 +18,7 @@ def extract_mermaid(response: str) -> List[str]:
     in_mermaid_block = False
     current_code = []
     for line in lines:
-        if line.strip().startswith("```mermaid"):
+        if re.match(r"^``` ?mermaid$", line.strip()):
             in_mermaid_block = True
             current_code = []
         elif line.strip().startswith("```") and in_mermaid_block:
