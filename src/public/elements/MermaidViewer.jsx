@@ -23,6 +23,9 @@ export default function MyComponent() {
   }, []);
 
   return (
-    <div className="mermaid">{props.code || "No Mermaid code provided."}</div>
+    <div>
+      <div>Mermaid Diagram {props.id}</div>
+      <div className="mermaid">{props.code || "No Mermaid code provided."}</div>
+    </div>
   );
 }

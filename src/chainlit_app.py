@@ -319,9 +319,11 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
             mermaid_codes = extract_mermaid(response)
             # If mermaid codes are found, send them as separate messages
             if mermaid_codes:
+                logger.debug(
+                    "Found %i mermaid code blocks.", len(mermaid_codes))
                 msg.elements = list(
-                    map(lambda code: cl.CustomElement(
-                        name="MermaidViewer", props={"code": code}), mermaid_codes)
+                    map(lambda code, id: cl.CustomElement(
+                        name="MermaidViewer", props={"code": code, "id": id}), mermaid_codes, range(1, len(mermaid_codes) + 1))
                 )
 
             await msg.send()
