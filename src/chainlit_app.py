@@ -40,6 +40,7 @@ from yaml.loader import SafeLoader
 from agent_manager import ChainlitAgentManager
 
 from agents import RESPONSE_TAG, agent_registry
+from utils.mermaid import extract_mermaid
 
 AUTH_CONFIG_FILE = "./config/auth-config.yaml"
 
@@ -315,32 +316,13 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
         # check if any mermaid tags are present in the response and extract the code
         # there may be multiple mermaid code blocks, so create a list of them
         if response:
-            mermaid_codes = []
-            lines = response.split("\n")
-            in_mermaid_block = False
-            current_code = []
-            for line in lines:
-                if line.strip().startswith("```mermaid"):
-                    in_mermaid_block = True
-                    current_code = []
-                elif line.strip().startswith("```") and in_mermaid_block:
-                    in_mermaid_block = False
-                    if current_code:
-                        mermaid_codes.append("\n".join(current_code))
-                elif in_mermaid_block:
-                    current_code.append(line)
-            if in_mermaid_block and current_code:
-                # If we reach the end of the response while still in a mermaid block
-                mermaid_codes.append("\n".join(current_code))
+            mermaid_codes = extract_mermaid(response)
             # If mermaid codes are found, send them as separate messages
             if mermaid_codes:
-                elements = []
-                for code in mermaid_codes:
-                    elements.append(
-                        cl.CustomElement(name="MermaidViewer",
-                                         props={"code": code})
-                    )
-                msg.elements = elements
+                msg.elements = list(
+                    map(lambda code: cl.CustomElement(
+                        name="MermaidViewer", props={"code": code}), mermaid_codes)
+                )
 
             await msg.send()
             # Add assistant response to history
