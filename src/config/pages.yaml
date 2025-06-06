@@ -16,13 +16,6 @@
 #   - subtitle: Subtitle displayed below the header
 
 agents:
-  full_facilitator:
-    persona: prompts/facilitator_persona.md
-    documents:
-      - prompts/ai_discovery_cards.md
-      - prompts/design_thinking.md
-    model: gpt-4o
-    temperature: 1
   facilitator:
     persona: prompts/facilitator_persona.md
     model: gpt-4o
@@ -76,29 +69,16 @@ agents:
 sections:
   Coach:
     - type: agent
-      agent: full_facilitator
-      title: Facilitator
-      icon: 🧑‍🏫
-      url_path: Facilitator
-      header: 🧑‍🏫 AI Discovery Cards Facilitator
-      subtitle: I'm your AI Design Thinking Expert and can guide you through the AI Discovery Cards Workshop step by step.
-      admin_only: true # Only visible to admins
-    - type: agent
-      agent: design_thinking_expert
-      title: Design Thinking Expert
-      icon: 💡
-      url_path: DesignThinkingExpert
-      header: 💡 AI Design Thinking Expert
-      subtitle: I'm your AI Design Thinking Expert and can guide you through the Design Thinking process step by step.
-      admin_only: true # Only visible to admins
-    - type: agent
       default: true
       agent: multi_agent
-      title: Multi Agent
-      icon: 🧪
+      title: AI Discovery Cards Facilitator
+      icon: 🧑‍🏫
       url_path: MultiAgent
-      header: 🧪 AI Multi Agent
-      subtitle: I'm a multi-agent that can help you as a facilitator and have access to the Design Thinking and AI Discovery Cards experts.
+      header: 🧑‍🏫 AI Discovery Cards Facilitator
+      subtitle: |
+        I'm a multi-expert Agent that can help you as a facilitator and have access to the:
+        - 💡Design Thinking expert, and
+        - 🧑‍🏫 AI Discovery Cards expert.
       admin_only: true # Only visible to admins
   Customers:
     - type: agent
