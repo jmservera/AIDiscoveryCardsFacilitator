@@ -178,27 +178,8 @@ async def start() -> None:
         await cl.Message(content="❌ Authentication required. Please log in.").send()
         return
 
-    mermaid1 = cl.CustomElement(name="MermaidViewer", props={
-        "code": """
-graph TD;
-            A[User] -->|Sends message| B[Agent];
-            B -->|Processes message| C[Response];
-            C -->|Sends response| A;
-        """
-    })
-
-    mermaid2 = cl.CustomElement(name="MermaidViewer", props={
-        "code": """
-graph TD;
-            X[Robot] -->|Selects agent| B[Agent];
-            B -->|Processes message| C[Response];
-            C -->|Sends response| X;
-        """
-    })
-
     await cl.Message(
-        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n",
-        elements=[mermaid1, mermaid2]).send()
+        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n").send()
 
     user_roles = user.metadata.get("roles", ["user"])
     available_agents = agent_manager.get_available_agents(user_roles)
@@ -326,15 +307,43 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
                         step.output = cb.usage_metadata
                     if response:
                         step.output = "Generating response..."
-                        await step.stream_token(response)
                         await msg.stream_token(response)
                 step.output = cb.usage_metadata
                 await step.send()
-        await msg.send()
 
         response = msg.content.strip() if msg.content else None
-        # Add assistant response to history
+        # check if any mermaid tags are present in the response and extract the code
+        # there may be multiple mermaid code blocks, so create a list of them
         if response:
+            mermaid_codes = []
+            lines = response.split("\n")
+            in_mermaid_block = False
+            current_code = []
+            for line in lines:
+                if line.strip().startswith("```mermaid"):
+                    in_mermaid_block = True
+                    current_code = []
+                elif line.strip().startswith("```") and in_mermaid_block:
+                    in_mermaid_block = False
+                    if current_code:
+                        mermaid_codes.append("\n".join(current_code))
+                elif in_mermaid_block:
+                    current_code.append(line)
+            if in_mermaid_block and current_code:
+                # If we reach the end of the response while still in a mermaid block
+                mermaid_codes.append("\n".join(current_code))
+            # If mermaid codes are found, send them as separate messages
+            if mermaid_codes:
+                elements = []
+                for code in mermaid_codes:
+                    elements.append(
+                        cl.CustomElement(name="MermaidViewer",
+                                         props={"code": code})
+                    )
+                msg.elements = elements
+
+            await msg.send()
+            # Add assistant response to history
             history.append({"role": "assistant", "content": response})
             cl.user_session.set("conversation_history", history)
 
@@ -349,16 +358,16 @@ async def on_chat_resume(thread: ThreadDict) -> None:
     user = cl.user_session.get("user")
     if user:
         user_roles = user.metadata.get("roles", ["user"])
-        available_agents = agent_manager.get_available_agents(user_roles)
+        available_agents = agent_manager.get_available_agents(
+            user_roles)
         cl.user_session.set("available_agents", available_agents)
 
-        # Restore conversation history if available
-        metadata = thread.get("metadata", {})
-        if metadata and "conversation_history" in metadata:
-            cl.user_session.set(
-                "conversation_history", metadata["conversation_history"]
-            )
-
+    # Restore conversation history if available
+    metadata = thread.get("metadata", {})
+    if metadata and "conversation_history" in metadata:
+        cl.user_session.set(
+            "conversation_history", metadata["conversation_history"]
+        )
 
 if __name__ == "__main__":
     cl.run()

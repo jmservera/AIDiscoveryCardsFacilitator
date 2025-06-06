@@ -132,3 +132,5 @@ dmypy.json
 
 ./**/auth-config.yaml
 src/.chainlit/.langchain.db
+
+src/.files/**/*
