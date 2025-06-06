@@ -88,8 +88,11 @@ jobs:
           AZURE_PRINCIPAL_TYPE: "ServicePrincipal"
 
       - name: Deploy Application
-        run: azd deploy --no-prompt
+        run: |
+          echo "${AUTH_CONFIG_YAML}" > src/config/auth-config.yaml
+          azd deploy --no-prompt
         env:
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AUTH_CONFIG_YAML: ${{ secrets.AUTH_CONFIG_YAML }}
