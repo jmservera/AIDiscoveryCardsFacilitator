@@ -130,7 +130,7 @@ dmypy.json
 .vscode/settings.json
 .azure
 
-./**/auth-config.yaml
+src/**/auth-config.yaml
 src/.chainlit/.langchain.db
 
 src/.files/**/*
