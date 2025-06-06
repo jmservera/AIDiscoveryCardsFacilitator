@@ -178,8 +178,27 @@ async def start() -> None:
         await cl.Message(content="❌ Authentication required. Please log in.").send()
         return
 
+    mermaid1 = cl.CustomElement(name="MermaidViewer", props={
+        "code": """
+graph TD;
+            A[User] -->|Sends message| B[Agent];
+            B -->|Processes message| C[Response];
+            C -->|Sends response| A;
+        """
+    })
+
+    mermaid2 = cl.CustomElement(name="MermaidViewer", props={
+        "code": """
+graph TD;
+            X[Robot] -->|Selects agent| B[Agent];
+            B -->|Processes message| C[Response];
+            C -->|Sends response| X;
+        """
+    })
+
     await cl.Message(
-        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n").send()
+        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n",
+        elements=[mermaid1, mermaid2]).send()
 
     user_roles = user.metadata.get("roles", ["user"])
     available_agents = agent_manager.get_available_agents(user_roles)
@@ -198,6 +217,7 @@ async def start() -> None:
                     content=f"## {agent_info['header']}.\n\n{agent_info['subtitle']}"
                 ).send()
                 break
+
     if not current_agent_key:
         # If no current agent is set, default to the first available agent
         if available_agents:
@@ -205,6 +225,7 @@ async def start() -> None:
         else:
             await cl.Message(content="❌ No agents available.").send()
             return
+    # Set the current agent key in user session
     cl.user_session.set("current_agent_key", current_agent_key)
 
 
