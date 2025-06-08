@@ -48,12 +48,14 @@ agents:
        {input} 
       ----------------------
 
+      - During the first steps of the workshop, return "facilitator", usually until step 4.
+      - When the ai or the human asks for a specific expert, analyze the conversation and return the appropriate expert.
       - When the conversation needs to go through a design thinking session return "design_thinking_expert".
       - When it needs to cover any design thinking topic (like brainstorming, reverse brainstorming, customer journey, etc.) return "design_thinking_expert".
       - For any question related to the cards, return "ai_discovery_expert".
       - When you are in the step nr. 5 "Explore the AI Envisioning Cards", return "ai_discovery_expert".
       - For anything about the workshop and the process, return "facilitator".
-      - In any other case, return "facilitator". 
+      - In any other case, return "facilitator".
 
       Only answer with one of the words provided.
       Your answer (design_thinking_expert/ai_discovery_expert/facilitator):
