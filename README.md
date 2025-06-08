@@ -136,4 +136,33 @@ graph TD
 The diagram above shows a simple decision flow.
 ````
 
-The application will detect the Mermaid code blocks and render them as interactive diagrams while preserving the rest of the response's markdown formatting.
+The application will detect the Mermaid code blocks and render them as diagrams while preserving the rest of the response's markdown formatting.
+
+## GitHub Actions Deployment: Required Variables and Secrets
+
+To enable automated deployment to Azure using GitHub Actions and managed identity federation, you must configure the following repository variables and secrets:
+
+### Required GitHub Repository Variables
+
+- `AZURE_CLIENT_ID`: The client ID of the Azure AD application (service principal) used for federated authentication.
+- `AZURE_TENANT_ID`: The Azure Active Directory tenant ID.
+- `AZURE_SUBSCRIPTION_ID`: The Azure subscription ID where the resources will be deployed.
+- `AZURE_ENV_NAME`: The name of the Azure Developer CLI environment (if used in your workflow).
+- `AZURE_LOCATION`: The Azure region/location for resource deployment (e.g., "westeurope").
+
+### Required GitHub Repository Secrets
+
+- `AUTH_CONFIG_YAML`: The full YAML content for `src/config/auth-config.yaml` (used to provide authentication configuration securely at deploy time).
+- `AZURE_CREDENTIALS` (optional): Only required if not using OIDC federation. For managed identity federation, this is not needed.
+
+### Managed Identity Federation Setup
+
+This workflow uses GitHub's OpenID Connect (OIDC) integration to authenticate to Azure without storing long-lived credentials. Ensure you have:
+
+1. Created an Azure AD application (service principal) with federated credentials for your GitHub repository.
+2. Assigned the necessary roles (e.g., Contributor) to the service principal in your Azure subscription.
+3. Configured the federated credential in Azure AD to trust your GitHub repository and workflow.
+
+For more details, see the [official Microsoft documentation on OIDC and federated credentials](https://learn.microsoft.com/azure/developer/github/connect-from-azure?tabs=azure-cli%2Clinux&pivots=identity-fed).
+
+---
