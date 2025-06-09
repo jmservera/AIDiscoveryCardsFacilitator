@@ -134,3 +134,6 @@ src/**/auth-config.yaml
 src/.chainlit/.langchain.db
 
 src/.files/**/*
+
+# Test files for development
+test_supervisor_implementation.py

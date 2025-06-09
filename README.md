@@ -115,6 +115,37 @@ agents:
     temperature: 0.5
 ```
 
+**Supervisor Agent Configuration** (for task delegation):
+
+```yaml
+agents:
+  supervisor_agent:
+    workers:
+      - worker1
+      - worker2
+      - worker3
+    delegation_prompt: |
+      You are a supervisor that coordinates multiple worker agents.
+      Analyze the request and delegate to the appropriate worker.
+      Available workers: worker1, worker2, worker3
+      Response format:
+      WORKER: [worker_name]
+      REASON: [explanation]
+    model: gpt-4o
+    temperature: 0.3
+```
+
+**ReAct Agent Configuration** (for reasoning and acting):
+
+```yaml
+agents:
+  react_agent:
+    react_persona: prompts/my_persona.md
+    model: gpt-4o
+    temperature: 0.7
+    max_iterations: 3
+```
+
 ## Mermaid Diagram Support
 
 The application supports rendering Mermaid diagrams directly in chat responses. When the AI generates responses containing Mermaid diagram code blocks, they will be automatically rendered as visual diagrams.
