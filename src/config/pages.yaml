@@ -40,33 +40,52 @@ agents:
     document: prompts/design_thinking.md
     model: o4-mini
     temperature: 1
+  react_facilitator:
+    react_persona: prompts/facilitator_persona.md
+    model: gpt-4o
+    temperature: 0.7
+    max_iterations: 3
   multi_agent:
-    condition: |
-      You are an agent that must analyze the user thread.
-      The user thread between long dashes (---) contains the conversation history:
-      ----------------------
-       {input} 
-      ----------------------
+    workers:
+      - facilitator
+      - ai_discovery_expert
+      - design_thinking_expert
+    delegation_prompt: |
+      You are a supervisor agent that coordinates multiple specialized agents to help with the AI Discovery Cards Workshop.
 
-      - During the first steps of the workshop, return "facilitator", usually until step 4.
-      - When the ai or the human asks for a specific expert, analyze the conversation and return the appropriate expert.
-      - When the conversation needs to go through a design thinking session return "design_thinking_expert".
-      - When it needs to cover any design thinking topic (like brainstorming, reverse brainstorming, customer journey, etc.) return "design_thinking_expert".
-      - For any question related to the cards, return "ai_discovery_expert".
-      - When you are in the step nr. 5 "Explore the AI Envisioning Cards", return "ai_discovery_expert".
-      - For anything about the workshop and the process, return "facilitator".
-      - In any other case, return "facilitator".
+      Available worker agents:
+      - facilitator: The main workshop facilitator who guides through the 12-step AI Discovery Cards process
+      - ai_discovery_expert: Expert in AI use cases and the AI Discovery Cards themselves
+      - design_thinking_expert: Expert in design thinking methodologies and brainstorming sessions
 
-      Only answer with one of the words provided.
-      Your answer (design_thinking_expert/ai_discovery_expert/facilitator):
-    model: gpt-4.1-nano
-    agents:
-      - condition: design_thinking_expert
-        agent: design_thinking_expert
-      - condition: facilitator
-        agent: facilitator
-      - condition: ai_discovery_expert
-        agent: ai_discovery_expert
+      Analyze the user's request and determine which worker agent should handle it:
+      
+      Delegate to 'facilitator' when:
+      - Starting the workshop or discussing the overall process
+      - Working through the 12 workshop steps (steps 1-4, 6-8, 10-12)
+      - Coordinating the overall workshop flow
+      - General workshop guidance and facilitation
+
+      Delegate to 'ai_discovery_expert' when:
+      - Step 5: Exploring the AI Envisioning Cards
+      - Questions about specific AI use cases or capabilities
+      - Explaining AI Discovery Cards content
+      - Technical AI-related discussions
+
+      Delegate to 'design_thinking_expert' when:
+      - Step 9: Building new ideas for workflow steps
+      - Brainstorming and ideation activities
+      - Design thinking methodologies
+      - Creative problem-solving sessions
+      - Customer journey mapping or similar design thinking tools
+
+      If the request is unclear or could be handled by multiple agents, delegate to 'facilitator' as the primary coordinator.
+      
+      Response format:
+      WORKER: [agent_name]
+      REASON: [brief explanation]
+    model: gpt-4o
+    temperature: 0.3
 
 sections:
   Coach:
@@ -81,6 +100,14 @@ sections:
         I'm a multi-expert Agent that can help you as a facilitator and have access to the:
         - 💡Design Thinking expert, and
         - 🧑‍🏫 AI Discovery Cards expert.
+      admin_only: true # Only visible to admins
+    - type: agent
+      agent: react_facilitator
+      title: ReAct Facilitator
+      icon: 🤔
+      url_path: ReactFacilitator
+      header: 🤔 ReAct AI Discovery Cards Facilitator
+      subtitle: A reasoning-and-acting facilitator that thinks through problems step by step.
       admin_only: true # Only visible to admins
   Customers:
     - type: agent

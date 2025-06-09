@@ -119,6 +119,73 @@
                             "agents"
                         ],
                         "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "supervisor"
+                            },
+                            "workers": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "$dynamicRef": "#agentNames"
+                                },
+                                "description": "List of worker agent keys that this supervisor can delegate to."
+                            },
+                            "delegation_prompt": {
+                                "type": "string",
+                                "description": "Prompt used to determine which worker should handle a task."
+                            },
+                            "model": {
+                                "type": "string",
+                                "description": "Optional model override for this agent."
+                            },
+                            "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2,
+                                "description": "Optional temperature override for this agent."
+                            }
+                        },
+                        "required": [
+                            "workers",
+                            "delegation_prompt"
+                        ],
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "const": "react"
+                            },
+                            "react_persona": {
+                                "type": "string",
+                                "description": "Path to the persona prompt file for the ReAct agent."
+                            },
+                            "model": {
+                                "type": "string",
+                                "description": "Optional model override for this agent."
+                            },
+                            "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2,
+                                "description": "Optional temperature override for this agent."
+                            },
+                            "max_iterations": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 10,
+                                "description": "Maximum number of reasoning iterations."
+                            }
+                        },
+                        "required": [
+                            "react_persona"
+                        ],
+                        "additionalProperties": false
                     }
                 ]
             }

@@ -27,7 +27,9 @@ agent_registry : Agent registry and factory
 
 from .agent import Agent
 from .agent_registry import agent_registry
+from .supervisor_agent import SupervisorAgent
+from .react_agent import ReactAgent
 
 RESPONSE_TAG = "response"
 
-__all__ = ["agent_registry", "Agent", "RESPONSE_TAG"]
+__all__ = ["agent_registry", "Agent", "SupervisorAgent", "ReactAgent", "RESPONSE_TAG"]

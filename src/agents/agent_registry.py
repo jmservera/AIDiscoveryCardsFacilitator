@@ -30,6 +30,8 @@ import yaml
 from .agent import Agent
 from .graph_agent import GraphAgent
 from .single_agent import SingleAgent
+from .supervisor_agent import SupervisorAgent
+from .react_agent import ReactAgent
 
 PAGES_FILE = Path(__file__).parent.parent / "config/pages.yaml"
 
@@ -146,13 +148,41 @@ class AgentRegistry:
                     temperature=temperature,
                     agents=agent_config.get("agents", []),
                 )
+            elif "workers" in agent_config and "delegation_prompt" in agent_config:
+                # Supervisor agent
+                logger.info(
+                    "Creating SupervisorAgent for key '%s' with model '%s'",
+                    agent_key,
+                    model,
+                )
+                return SupervisorAgent(
+                    agent_key=agent_key,
+                    workers=agent_config["workers"],
+                    delegation_prompt=agent_config["delegation_prompt"],
+                    model=model,
+                    temperature=temperature,
+                )
+            elif "react_persona" in agent_config:
+                # ReAct agent
+                logger.info(
+                    "Creating ReactAgent for key '%s' with model '%s'",
+                    agent_key,
+                    model,
+                )
+                return ReactAgent(
+                    agent_key=agent_key,
+                    persona=agent_config["react_persona"],
+                    model=model,
+                    temperature=temperature,
+                    max_iterations=agent_config.get("max_iterations", 3),
+                )
             else:
                 logger.error(
-                    "Invalid agent configuration for key '%s': missing 'persona' or 'personas'",
+                    "Invalid agent configuration for key '%s': missing required configuration fields",
                     agent_key,
                 )
                 raise ValueError(
-                    f"Invalid agent configuration for '{agent_key}': missing 'persona' or 'personas'"
+                    f"Invalid agent configuration for '{agent_key}': missing required configuration fields"
                 )
         except Exception as e:
             logger.exception("Error creating agent for key '%s': %s", agent_key, e)
