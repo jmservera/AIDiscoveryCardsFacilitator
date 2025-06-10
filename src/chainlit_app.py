@@ -35,7 +35,6 @@ import dotenv
 import yaml
 from chainlit.secret import random_secret
 from chainlit.types import ThreadDict
-from langchain.schema.runnable.config import RunnableConfig
 from yaml.loader import SafeLoader
 from agent_manager import ChainlitAgentManager
 
@@ -262,54 +261,31 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
         history.append({"role": "user", "content": content})
 
         msg = cl.Message(content="")
-        from langchain_core.callbacks import get_usage_metadata_callback
-
+        
         # Show typing indicator
         # async with cl.Step(name="🤔 Thinking...") as step:
         with cl.Step(name=agent_key) as step:
             # Process the message with the agent
             step.input = content
-            with get_usage_metadata_callback() as cb:
-                async for chunk in agent.astream(
-                    history,
-                    config=RunnableConfig(
-                        callbacks=[
-                            cl.LangchainCallbackHandler(),
-                        ]
-                    ),
-                ):
-                    response = ""
-                    if isinstance(chunk, tuple):
-                        message, metadata = chunk
-                        if (
-                            metadata
-                            and "tags" in metadata
-                            and RESPONSE_TAG in metadata["tags"]
-                        ):
-                            # Handle agent response chunk
-                            response = message.content
-                        else:
-                            if metadata and "langgraph_node" in metadata:
-                                logger.info(
-                                    f"Agent response Node: {metadata["langgraph_node"]}"
-                                )
-                            else:
-                                logger.info(f"Agent response: {metadata}")
-
-                        if metadata and "langgraph_node" in metadata:
-                            step.name = metadata["langgraph_node"]
-                            step.output = f"Processing with agent node: {metadata['langgraph_node']}"
-                            logger.info(
-                                f"Agent response Node: {metadata['langgraph_node']}"
-                            )
-                    else:
-                        response = chunk.content
-                    if cb.usage_metadata:
-                        step.output = cb.usage_metadata
-                    if response:
-                        step.output = "Generating response..."
-                        await msg.stream_token(response)
-                step.output = cb.usage_metadata
+            async for chunk in agent.astream(
+                history,
+                config={
+                    "callbacks": [
+                        cl.LangchainCallbackHandler(),
+                    ]
+                },
+            ):
+                response = ""
+                # Simplified response handling for Azure AI Agents Service
+                if hasattr(chunk, 'content'):
+                    response = chunk.content
+                else:
+                    response = str(chunk)
+                    
+                if response:
+                    step.output = "Generating response..."
+                    await msg.stream_token(response)
+                step.output = "Response completed"
                 await step.send()
 
         response = msg.content.strip() if msg.content else None
