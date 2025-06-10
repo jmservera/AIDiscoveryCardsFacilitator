@@ -7,11 +7,8 @@ openai==1.84.0
 azure-identity==1.23.0
 tiktoken==0.9.0
 
-# LangChain and LangGraph dependencies
-langgraph>=0.2.45
-langchain==0.3.25
-langchain-community==0.3.24
-langchain-openai>=0.2.8
+# Azure AI Agents Service dependencies
+azure-ai-agents>=1.0.1
 
 # Configuration and utilities
 PyYAML==6.0.2

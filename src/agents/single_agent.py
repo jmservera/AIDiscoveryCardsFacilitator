@@ -2,12 +2,14 @@
 single_agent.py
 
 This module defines the SingleAgent class, an implementation of a single agent
-with system message loading capabilities for use in conversational AI applications.
+with system message loading capabilities for use with Azure AI Agents Service.
 It provides mechanisms to initialize an agent with a specific persona, model, and
-optional document context, and to retrieve system messages based on these parameters.
+optional document context, and to create Azure AI agents with appropriate instructions.
 
 Classes:
-- SingleAgent: Implements a single agent with persona and document-based system message loading.
+--------
+SingleAgent : Agent
+    Implements a single agent with persona and document-based Azure AI agent creation.
 """
 
 import os
@@ -15,14 +17,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
-from langchain_core.messages import BaseMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import Runnable
-from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
-from langgraph.graph.state import CompiledStateGraph
-from typing_extensions import Annotated, TypedDict
-
+from azure.ai.agents.models import Agent as AzureAgent
 from utils.cached_loader import load_prompt_files
 
 from .agent import Agent
@@ -32,22 +27,9 @@ logger = getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
 
-class ChatState(TypedDict):
-    """
-    State definition for the chat workflow.
-
-    Attributes:
-    -----------
-    messages : Annotated[List[BaseMessage], add_messages]
-        List of conversation messages with automatic message addition functionality.
-    """
-
-    messages: Annotated[List[BaseMessage], add_messages]
-
-
 class SingleAgent(Agent):
     """
-    Implementation of a single agent with system message loading capabilities.
+    Implementation of a single agent using Azure AI Agents Service with system message loading capabilities.
     """
 
     def __init__(
@@ -95,25 +77,38 @@ class SingleAgent(Agent):
         )
         return load_prompt_files(self.persona, self.documents)
 
-    def create_chain(self) -> Runnable:  # [dict[Any, Any], BaseMessage]:
+    def create_agent(self) -> AzureAgent:
         """
-        Create and return a compiled state graph for this agent.
+        Create and return an Azure AI agent for this single agent.
 
         Returns:
         --------
-        CompiledStateGraph
-            A compiled state graph representing the agent's workflow.
+        AzureAgent
+            An Azure AI agent configured with the persona and document instructions.
         """
-        from agents import RESPONSE_TAG
-
-        if self._chain is None:
-            start_prompt = ChatPromptTemplate.from_messages(
-                [MessagesPlaceholder("messages")]
-            )
-            # Single Agent is tagged as a response agent, this means
-            # responses from this agent will be show in the UI
-            llm = self._get_azure_chat_openai(tag=RESPONSE_TAG)
-            chain = start_prompt | llm
-            self._chain = chain
-
-        return self._chain
+        client = self._get_agents_client()
+        
+        # Get system prompts and combine them into instructions
+        system_prompts = self.get_system_prompts()
+        instructions = ""
+        
+        for prompt in system_prompts:
+            if prompt.get("role") == "system":
+                instructions += prompt.get("content", "") + "\n\n"
+        
+        # Create the Azure AI agent
+        azure_agent = client.create_agent(
+            model=self.model,
+            name=f"{self.agent_key}_agent",
+            description=f"Single agent for {self.agent_key}",
+            instructions=instructions.strip(),
+            temperature=self.temperature
+        )
+        
+        logger.info(
+            "Created Azure AI agent %s for SingleAgent %s",
+            azure_agent.id,
+            self.agent_key
+        )
+        
+        return azure_agent
