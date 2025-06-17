@@ -37,8 +37,8 @@ from chainlit.secret import random_secret
 from chainlit.types import ThreadDict
 from langchain.schema.runnable.config import RunnableConfig
 from yaml.loader import SafeLoader
-from agent_manager import ChainlitAgentManager
 
+from agent_manager import ChainlitAgentManager
 from agents import RESPONSE_TAG, agent_registry
 from utils.mermaid import extract_mermaid
 
@@ -57,8 +57,7 @@ if not os.getenv("CHAINLIT_AUTH_SECRET"):
         "CHAINLIT_AUTH_SECRET is not set. Authentication will not be secure. Generating a random secret."
     )
     os.environ["CHAINLIT_AUTH_SECRET"] = random_secret()
-    dotenv.set_key(".env", "CHAINLIT_AUTH_SECRET",
-                   os.environ["CHAINLIT_AUTH_SECRET"])
+    dotenv.set_key(".env", "CHAINLIT_AUTH_SECRET", os.environ["CHAINLIT_AUTH_SECRET"])
 
 
 # Global agent manager instance
@@ -95,9 +94,9 @@ async def auth_callback(username: str, password: str) -> Optional[cl.User]:
             # Handle both bcrypt hashed passwords and plain text for demo
             if stored_password.startswith("$2b$"):
                 # Bcrypt hashed password
-                if bcrypt.checkpw(
+                if bcrypt.hashpw(
                     password.encode("utf-8"), stored_password.encode("utf-8")
-                ):
+                ) == stored_password.encode("utf-8"):
                     return cl.User(
                         identifier=username,
                         metadata={
@@ -107,6 +106,11 @@ async def auth_callback(username: str, password: str) -> Optional[cl.User]:
                             "roles": user_data.get("roles", ["user"]),
                         },
                     )
+                else:
+                    logger.warning(
+                        f"Authentication failed for user '{username}': Incorrect password."
+                    )
+                    return None
             else:
                 # For demo purposes, allow simple password check
                 # In production, use only bcrypt
@@ -165,7 +169,7 @@ async def chat_profile(user: Optional[cl.User] = None) -> List[cl.ChatProfile]:
                 cl.ChatProfile(
                     name=agent_info["header"],
                     markdown_description=agent_info["subtitle"],
-                    default=agent_info.get("default", False)
+                    default=agent_info.get("default", False),
                 )
             )
     return profiles
@@ -180,7 +184,8 @@ async def start() -> None:
         return
 
     await cl.Message(
-        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n").send()
+        content=f"👋 Welcome, {user.metadata.get('first_name', 'User')}! You are logged in as `{user.identifier}`.\n\n"
+    ).send()
 
     user_roles = user.metadata.get("roles", ["user"])
     available_agents = agent_manager.get_available_agents(user_roles)
@@ -319,11 +324,15 @@ async def process_with_agent(content: str, agent_key: str, user: cl.User) -> Non
             mermaid_codes = extract_mermaid(response)
             # If mermaid codes are found, send them as separate messages
             if mermaid_codes:
-                logger.debug(
-                    "Found %i mermaid code blocks.", len(mermaid_codes))
+                logger.debug("Found %i mermaid code blocks.", len(mermaid_codes))
                 msg.elements = list(
-                    map(lambda code, id: cl.CustomElement(
-                        name="MermaidViewer", props={"code": code, "id": id}), mermaid_codes, range(1, len(mermaid_codes) + 1))
+                    map(
+                        lambda code, id: cl.CustomElement(
+                            name="MermaidViewer", props={"code": code, "id": id}
+                        ),
+                        mermaid_codes,
+                        range(1, len(mermaid_codes) + 1),
+                    )
                 )
 
             await msg.send()
@@ -342,16 +351,14 @@ async def on_chat_resume(thread: ThreadDict) -> None:
     user = cl.user_session.get("user")
     if user:
         user_roles = user.metadata.get("roles", ["user"])
-        available_agents = agent_manager.get_available_agents(
-            user_roles)
+        available_agents = agent_manager.get_available_agents(user_roles)
         cl.user_session.set("available_agents", available_agents)
 
     # Restore conversation history if available
     metadata = thread.get("metadata", {})
     if metadata and "conversation_history" in metadata:
-        cl.user_session.set(
-            "conversation_history", metadata["conversation_history"]
-        )
+        cl.user_session.set("conversation_history", metadata["conversation_history"])
+
 
 if __name__ == "__main__":
     cl.run()
